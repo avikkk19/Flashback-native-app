@@ -36,9 +36,11 @@ export default function LivenessScreen() {
     setInstructions(LivenessDetectionService.getInstructions());
     setTips(LivenessDetectionService.getTips());
     
-    // Set permission as granted for now (we'll handle camera later)
+    // Set permission as granted for now (using placeholder camera)
     setHasPermission(true);
   }, []);
+
+
 
   /**
    * Start liveness check

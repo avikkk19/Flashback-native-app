@@ -84,13 +84,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         AsyncStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(user)),
       ]);
 
-      setState({
+      const newState = {
         isAuthenticated: true,
         user,
         token,
         isLoading: false,
         livenessCompleted: false, // New login requires liveness check
-      });
+      };
+      console.log('[AUTH] Setting new state after login:', newState);
+      setState(newState);
     } catch (error) {
       console.error('Error saving auth state:', error);
       throw error;

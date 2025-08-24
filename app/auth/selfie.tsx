@@ -1,7 +1,7 @@
 import { Camera } from 'expo-camera';
 import { router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
     ActivityIndicator,
     Alert,

@@ -15,18 +15,27 @@ function RootLayoutNav() {
   const router = useRouter();
 
   useEffect(() => {
+    console.log('[NAV] Layout effect triggered:', { isAuthenticated, livenessCompleted, segments, isLoading });
     if (isLoading) return;
 
     const inAuthGroup = segments[0] === 'auth';
+    const currentScreen = segments[segments.length - 1];
+
+    console.log('[NAV] Auth state:', { isAuthenticated, livenessCompleted, inAuthGroup, currentScreen });
 
     if (!isAuthenticated && !inAuthGroup) {
       // Not authenticated, go to phone screen
+      console.log('[NAV] Redirecting to phone screen');
       router.replace('/auth/phone');
-    } else if (isAuthenticated && !livenessCompleted && segments[0] !== 'auth') {
+    } else if (isAuthenticated && !livenessCompleted) {
       // Authenticated but liveness not completed, go to liveness
-      router.replace('/auth/liveness');
+      if (currentScreen !== 'liveness') {
+        console.log('[NAV] Redirecting to liveness screen');
+        router.replace('/auth/liveness');
+      }
     } else if (isAuthenticated && livenessCompleted && inAuthGroup) {
       // Authenticated and liveness completed, go to home
+      console.log('[NAV] Redirecting to home screen');
       router.replace('/(tabs)');
     }
   }, [isAuthenticated, livenessCompleted, segments, isLoading]);
