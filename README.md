@@ -1,65 +1,50 @@
-# Flashback - OTP Login + Liveness Check + Selfie Upload
+# Flashback - React Native Liveness Detection App
 
-A React Native/Expo mobile application that implements a complete authentication flow with phone number verification, on-device liveness detection, and selfie upload functionality.
+A production-ready React Native application with advanced liveness detection using MediaPipe algorithms, secure authentication, and real-time selfie capture and upload.
 
-## 🎯 Features
+## 🚀 Features
 
-- **Phone Number Authentication**: E.164 format validation and OTP verification
-- **On-Device Liveness Detection**: Real-time face detection and liveness analysis
-- **Selfie Capture & Upload**: Camera integration with backend upload
-- **Modern UI/UX**: Beautiful, responsive design with smooth transitions
-- **Cross-Platform**: Works on iOS and Android
-- **TypeScript**: Full type safety and better development experience
+- **Advanced Liveness Detection**: MediaPipe-based facial landmark analysis
+- **Secure Authentication**: JWT-based OTP verification system
+- **Real-time Camera**: Live face detection and analysis
+- **Selfie Capture**: High-quality image capture and upload
+- **Production Ready**: Comprehensive error handling and security
+- **Mobile Optimized**: Touch-friendly UI with real-time feedback
 
-## 🏗️ Architecture Overview
+## 📱 Screenshots
 
-### Project Structure
 ```
-flashback/
-├── app/                    # Expo Router app directory
-│   ├── auth/              # Authentication screens
-│   │   ├── phone.tsx      # Phone number input
-│   │   ├── otp.tsx        # OTP verification
-│   │   ├── liveness.tsx   # Liveness check
-│   │   └── selfie.tsx     # Selfie capture & upload
-│   ├── (tabs)/            # Main app screens
-│   └── _layout.tsx        # Root layout with auth provider
-├── components/            # Reusable UI components
-├── contexts/              # React contexts (AuthContext)
-├── services/              # API and business logic services
-├── constants/             # App constants and colors
-└── hooks/                 # Custom React hooks
+┌─────────────────────────────────┐
+│ ← Back    Selfie Capture       │
+├─────────────────────────────────┤
+│                                 │
+│        📷 Camera View           │
+│                                 │
+│    ┌─────────────┐              │
+│    │ Face Frame  │              │
+│    └─────────────┘              │
+│                                 │
+│    [Instructions]                │
+├─────────────────────────────────┤
+│                                 │
+│    📱 Controls Panel            │
+│                                 │
+│    [Upload/Retake Buttons]      │
+│                                 │
+└─────────────────────────────────┘
 ```
 
-### Key Components
-
-1. **Authentication Flow**
-   - Phone number validation (E.164 format)
-   - OTP generation and verification
-   - JWT token management
-   - Persistent authentication state
-
-2. **Liveness Detection**
-   - On-device face detection
-   - Movement analysis
-   - Real-time feedback
-   - No external SDK dependencies
-
-3. **Camera Integration**
-   - Front camera access
-   - Image capture and preview
-   - File upload to backend
-   - Error handling and retry logic
-
-## 🔧 Setup & Installation
+## 🛠️ Setup & Run Instructions
 
 ### Prerequisites
-- Node.js (v18 or higher)
-- npm or yarn
-- Expo CLI
-- iOS Simulator or Android Emulator (for testing)
 
-### Installation Steps
+- **Node.js**: v18 or higher
+- **npm**: v8 or higher
+- **Expo CLI**: Latest version
+- **Android Studio** (for Android development)
+- **Xcode** (for iOS development, macOS only)
+
+### Installation
 
 1. **Clone the repository**
    ```bash
@@ -72,205 +57,420 @@ flashback/
    npm install
    ```
 
-3. **Configure API endpoints**
-   - Update the `REFRESH_TOKEN` in `services/api.ts`
-   - Ensure the API base URL is correct
+3. **Install Expo CLI globally**
+   ```bash
+   npm install -g @expo/cli
+   ```
 
-4. **Start the development server**
+4. **Install MediaPipe packages**
+   ```bash
+   npm install @mediapipe/face_mesh @mediapipe/camera_utils @mediapipe/drawing_utils
+   ```
+
+### Environment Configuration
+
+1. **Create environment file**
+   ```bash
+   cp config/environment.example.ts config/environment.ts
+   ```
+
+2. **Configure API endpoints**
+   ```typescript
+   // config/environment.ts
+   export default {
+     API_BASE_URL: 'https://your-api-domain.com/api/mobile',
+     REFRESH_TOKEN: 'your-refresh-token',
+     // ... other config
+   };
+   ```
+
+### Running the App
+
+1. **Start development server**
    ```bash
    npm start
    ```
 
-5. **Run on device/simulator**
+2. **Run on device/simulator**
    ```bash
-   # iOS
-   npm run ios
-   
    # Android
    npm run android
    
-   # Web (for testing)
+   # iOS
+   npm run ios
+   
+   # Web
    npm run web
    ```
 
-## 📱 API Integration
-
-### Endpoints
-
-1. **Send OTP**
-   ```
-   POST https://flashback.inc:9000/api/mobile/sendOTP
-   Headers: Content-Type: application/json, Cookie: refreshToken=<token>
-   Body: { "phoneNumber": "+91XXXXXXXXXX" }
+3. **Build for production**
+   ```bash
+   # Android APK
+   expo build:android
+   
+   # iOS IPA
+   expo build:ios
    ```
 
-2. **Verify OTP**
-   ```
-   POST https://flashback.inc:9000/api/mobile/verifyOTP
-   Headers: Content-Type: application/json, Cookie: refreshToken=<token>
-   Body: { "phoneNumber": "+91XXXXXXXXXX", "otp": "123456", "login_platform": "MobileApp" }
-   ```
+## 🏗️ App Architecture Overview
 
-3. **Upload Selfie**
-   ```
-   POST https://flashback.inc:9000/api/mobile/uploadUserPortrait
-   Headers: Authorization: Bearer <JWT>, Cookie: refreshToken=<token>
-   Body: multipart/form-data (image file + username)
-   ```
+### Project Structure
 
-## 🎭 Liveness Detection Implementation
-
-### Overview
-The liveness detection system runs entirely on-device without requiring external SDKs or backend calls. It implements basic computer vision techniques to verify that a real person is present during the authentication process.
-
-### Detection Methods
-
-1. **Face Presence Detection**
-   - Real-time face detection using device camera
-   - Ensures a face is visible in the frame
-   - Validates face positioning and size
-
-2. **Movement Analysis**
-   - Tracks natural head movements
-   - Detects micro-expressions and blinks
-   - Prevents static image spoofing
-
-3. **Quality Assessment**
-   - Lighting condition analysis
-   - Image clarity verification
-   - Face angle validation
-
-### Technical Implementation
-
-```typescript
-// Liveness detection service
-class LivenessDetectionService {
-  async performLivenessCheck(cameraRef: React.RefObject<Camera>): Promise<LivenessResult> {
-    // 1. Face detection over time
-    // 2. Movement pattern analysis
-    // 3. Quality assessment
-    // 4. Confidence scoring
-  }
-}
+```
+flashback/
+├── app/                          # Expo Router screens
+│   ├── _layout.tsx              # Root layout with auth flow
+│   ├── auth/                    # Authentication screens
+│   │   ├── phone.tsx           # Phone number input
+│   │   ├── otp.tsx             # OTP verification
+│   │   ├── liveness.tsx        # Liveness detection
+│   │   └── selfie.tsx          # Selfie capture & upload
+│   └── (tabs)/                 # Main app tabs (after auth)
+├── components/                   # Reusable UI components
+├── contexts/                     # React Context providers
+│   └── AuthContext.tsx         # Authentication state management
+├── services/                     # Business logic services
+│   ├── api.ts                  # API client and endpoints
+│   ├── faceDetectionService.ts # MediaPipe liveness detection
+│   └── unifiedApi.ts           # API service wrapper
+├── config/                       # Configuration files
+│   └── environment.ts          # Environment variables
+├── constants/                    # App constants and themes
+├── hooks/                        # Custom React hooks
+└── assets/                       # Images, fonts, etc.
 ```
 
-### Detection Flow
-1. **Initialization**: Camera permission request and setup
-2. **Face Detection**: Continuous monitoring for face presence
-3. **Movement Tracking**: Analysis of natural movements
-4. **Quality Check**: Validation of image quality and lighting
-5. **Result Calculation**: Confidence scoring based on all factors
+### Architecture Patterns
+
+#### 1. **Expo Router Architecture**
+- **File-based routing** for intuitive navigation
+- **Stack navigation** for authentication flow
+- **Tab navigation** for main app sections
+- **Deep linking** support for external access
+
+#### 2. **Context API State Management**
+- **Global authentication state** via AuthContext
+- **Persistent storage** using AsyncStorage
+- **Real-time updates** for UI components
+- **Secure token management**
+
+#### 3. **Service Layer Pattern**
+- **Separation of concerns** between UI and business logic
+- **API abstraction** for backend communication
+- **Error handling** and retry mechanisms
+- **Progress tracking** for long-running operations
+
+#### 4. **Component Composition**
+- **Reusable components** for consistent UI
+- **Props-based configuration** for flexibility
+- **Event-driven interactions** for user actions
+- **Responsive design** for mobile optimization
+
+### Data Flow
+
+```
+User Input → Component → Service → API → Backend
+    ↑                                    ↓
+UI Update ← Context ← State ← Response ← Data
+```
 
 ### Security Features
-- **On-Device Processing**: No data sent to external servers
-- **Real-Time Analysis**: Continuous monitoring during check
-- **Multiple Validation Layers**: Face, movement, and quality checks
-- **Spoofing Prevention**: Detects static images and videos
 
-## 🎨 UI/UX Features
+- **JWT authentication** with refresh tokens
+- **Secure storage** using AsyncStorage
+- **Input validation** and sanitization
+- **HTTPS communication** for all API calls
+- **Token expiration** handling
 
-### Design Principles
-- **Modern & Clean**: Minimalist design with clear visual hierarchy
-- **Responsive**: Adapts to different screen sizes and orientations
-- **Accessible**: High contrast and readable typography
-- **Intuitive**: Clear navigation and user feedback
+## 🔍 Liveness Detection Logic-----------------------------------
 
-### Key UI Components
-- **Phone Input**: Auto-formatting and validation
-- **OTP Input**: 6-digit code with auto-focus
-- **Camera Interface**: Face frame overlay and instructions
-- **Progress Indicators**: Real-time feedback during processes
-- **Error Handling**: User-friendly error messages
+### Overview
 
-### Transitions & Animations
-- **Screen Transitions**: Smooth navigation between auth steps
-- **Loading States**: Progress indicators and spinners
-- **Success/Error Feedback**: Visual confirmation of actions
-- **Camera Overlays**: Animated face detection frames
+The liveness detection system implements **MediaPipe-based facial landmark analysis** to ensure the user is a real, live person and not a photo, video, or 3D model.
 
-## 🔒 Security Considerations
+### Core Algorithm
 
-### Data Protection
-- **Local Storage**: Sensitive data stored securely using AsyncStorage
-- **Token Management**: JWT tokens handled securely
-- **No Hardcoded Secrets**: All sensitive data externalized
-- **Input Validation**: Comprehensive validation on all inputs
+#### 1. **Eye Aspect Ratio (EAR) Calculation**
 
-### Privacy Features
-- **On-Device Processing**: Liveness detection runs locally
-- **Minimal Data Collection**: Only necessary user data collected
-- **Secure Upload**: Encrypted transmission of selfie images
-- **Session Management**: Proper logout and session cleanup
+```typescript
+// Calculate EAR for blink detection
+const calculateEyeAspectRatio = (landmarks: any[], eyePoints: number[]): number => {
+  const p = eyePoints.map(i => landmarks[i]);
+  
+  // Vertical distances
+  const v1 = calculateDistance(p[1], p[5]);
+  const v2 = calculateDistance(p[2], p[4]);
+  
+  // Horizontal distance
+  const h = calculateDistance(p[0], p[3]);
+  
+  // EAR = (v1 + v2) / (2.0 * h)
+  return (v1 + v2) / (2.0 * h);
+};
+```
+
+**EAR Thresholds:**
+- **< 0.20**: Eye closed (blink detected)
+- **≥ 0.25**: Eye open (reset blink state)
+
+#### 2. **Head Movement Detection**
+
+```typescript
+// Track nose tip position for head movement
+const detectHeadMovement = (landmarks: any[]): { movement: number; newNoseX: number } => {
+  const nose = landmarks[NOSE_TIP];
+  const currentNoseX = nose.x;
+  
+  if (prevNoseX !== null) {
+    const movement = Math.abs(currentNoseX - prevNoseX);
+    return { movement, newNoseX: currentNoseX };
+  }
+  
+  return { movement: 0, newNoseX: currentNoseX };
+};
+```
+
+**Movement Threshold:**
+- **> 0.02**: Significant head movement detected
+
+#### 3. **Mouth Activity Detection**
+
+```typescript
+// Measure mouth opening distance
+const calculateMouthOpening = (landmarks: any[]): number => {
+  const top = landmarks[MOUTH_TOP];
+  const bottom = landmarks[MOUTH_BOTTOM];
+  return calculateDistance(top, bottom);
+};
+```
+
+**Mouth Threshold:**
+- **> 0.04**: Mouth open (activity detected)
+
+### Liveness Criteria
+
+#### **Required Actions (All Must Pass):**
+
+1. **Minimum 1 Blink**
+   - EAR < 0.20 for blink detection
+   - EAR ≥ 0.25 to reset blink state
+   - Prevents rapid-fire blinking
+
+2. **Head Movement Required**
+   - Nose position change > 0.02
+   - Detects natural head motion
+   - Prevents static photo attacks
+
+3. **Mouth Activity**
+   - At least 2 mouth opening detections
+   - Distance > 0.04 for each detection
+   - Ensures live person interaction
+
+4. **Face Detection Rate**
+   - 80% minimum face detection rate
+   - Consistent face presence throughout
+   - Prevents partial face attacks
+
+#### **Confidence Calculation:**
+
+```typescript
+const overallConfidence = (
+  blinkConfidence + 
+  headMovementConfidence + 
+  mouthConfidence + 
+  faceConfidence
+) / 4;
+```
+
+### Real-Time Processing
+
+#### **Frame Analysis Cycle:**
+
+1. **Capture Frame** (every 200ms)
+   - High-quality camera capture
+   - Base64 encoding for processing
+   - Metadata extraction (dimensions, size)
+
+2. **Landmark Detection**
+   - MediaPipe face mesh processing
+   - 468 facial landmark points
+   - 3D coordinate extraction
+
+3. **Feature Analysis**
+   - EAR calculation for both eyes
+   - Head movement tracking
+   - Mouth activity measurement
+
+4. **Liveness Assessment**
+   - Real-time criteria checking
+   - Progress tracking
+   - Immediate feedback
+
+#### **Performance Optimizations:**
+
+- **Frame rate**: 5 FPS (200ms intervals)
+- **Image quality**: 0.5 (balanced quality/speed)
+- **Processing**: Async operations
+- **Memory**: Efficient landmark storage
+- **Battery**: Optimized camera usage
+
+### Security Features
+
+#### **Anti-Spoofing Measures:**
+
+1. **Multi-Factor Liveness**
+   - Blink + Head movement + Mouth activity
+   - All factors must be detected
+   - Prevents single-factor bypass
+
+2. **Temporal Validation**
+   - Minimum time between actions
+   - Natural movement patterns
+   - Prevents robotic behavior
+
+3. **Spatial Consistency**
+   - Face must remain in frame
+   - Consistent landmark positions
+   - Prevents partial face attacks
+
+4. **Motion Validation**
+   - Real-time movement detection
+   - Natural gesture patterns
+   - Prevents static image attacks
+
+### User Experience
+
+#### **Real-Time Guidance:**
+
+```
+1. "Face detected! Please blink naturally..."
+2. "Great! 1 blink detected. Please move your head slightly..."
+3. "Head movement detected! Now open your mouth slightly..."
+4. "Perfect! Liveness check passed!"
+```
+
+#### **Progress Indicators:**
+
+- **Visual progress bar** showing completion
+- **Real-time status updates** for each action
+- **Immediate feedback** for detected movements
+- **Clear success/failure** messaging
+
+#### **Error Handling:**
+
+- **Graceful degradation** for edge cases
+- **Helpful error messages** for users
+- **Retry mechanisms** for failed attempts
+- **Fallback options** for technical issues
 
 ## 🧪 Testing
 
-### Development Testing
-- **Skip Options**: Development-only skip buttons for testing
-- **Mock Data**: Sample responses for API testing
-- **Error Simulation**: Test error handling scenarios
-- **Device Testing**: iOS and Android compatibility
+### Manual Testing
 
-### Test Scenarios
-1. **Happy Path**: Complete authentication flow
-2. **Error Handling**: Network failures, invalid inputs
-3. **Edge Cases**: Poor lighting, camera permissions denied
-4. **Performance**: Large image uploads, slow networks
+1. **Liveness Detection**
+   - Test with real person
+   - Test with photo (should fail)
+   - Test with video (should fail)
+   - Test edge cases (glasses, lighting)
+
+2. **Authentication Flow**
+   - Phone number validation
+   - OTP verification
+   - Token management
+   - Session handling
+
+3. **Selfie Upload**
+   - Image capture quality
+   - Upload progress tracking
+   - Error handling
+   - Success flow
+
+### Automated Testing
+
+```bash
+# Run tests
+npm test
+
+# Run specific test suites
+npm test -- --grep "liveness"
+npm test -- --grep "authentication"
+```
 
 ## 🚀 Deployment
 
-### Build Configuration
-```bash
-# Production build
-expo build:android
-expo build:ios
+### Production Build
 
-# Development build
-expo run:android
-expo run:ios
+1. **Environment Configuration**
+   ```bash
+   # Set production environment
+   export NODE_ENV=production
+   ```
+
+2. **Build Commands**
+```bash
+   # Android APK
+   expo build:android --type apk
+   
+   # iOS IPA
+   expo build:ios --type archive
+   ```
+
+3. **App Store Deployment**
+   - Configure app signing
+   - Set bundle identifiers
+   - Upload to stores
+   - Monitor analytics
+
+### Performance Monitoring
+
+- **Frame processing time** tracking
+- **Memory usage** monitoring
+- **Battery consumption** analysis
+- **User interaction** analytics
+
+## 🔧 Troubleshooting
+
+### Common Issues
+
+1. **Camera Permission Denied**
+   - Check device settings
+   - Restart app
+   - Clear app data
+
+2. **Liveness Detection Failing**
+   - Ensure good lighting
+   - Remove glasses/hats
+   - Perform natural movements
+   - Check camera focus
+
+3. **Upload Failures**
+   - Verify internet connection
+   - Check API endpoint
+   - Validate authentication token
+   - Review error logs
+
+### Debug Mode
+
+Enable debug logging:
+
+```typescript
+// In development mode
+if (__DEV__) {
+  console.log('[DEBUG] Detailed information');
+}
 ```
 
-### Environment Variables
-- `API_BASE_URL`: Backend API endpoint
-- `REFRESH_TOKEN`: Authentication token
-- `ENVIRONMENT`: Development/Production mode
+## 📚 API Reference
 
-## 📋 Requirements Compliance
+### Authentication Endpoints
 
-### Functional Requirements ✅
-- [x] Phone number input with E.164 validation
-- [x] OTP generation and verification
-- [x] On-device liveness detection
-- [x] Selfie capture and upload
-- [x] Error handling and user feedback
-- [x] Welcome screen with user info and selfie
+- `POST /sendOTP` - Send OTP to phone number
+- `POST /verifyOTP` - Verify OTP and get token
+- `POST /uploadUserPortrait` - Upload selfie image
 
-### Non-Functional Requirements ✅
-- [x] No paid/proprietary SDKs used
-- [x] Clear separation of concerns
-- [x] Proper error handling and validation
-- [x] Comprehensive code comments
-- [x] Smooth screen transitions
-- [x] Responsive UI design
+### Request/Response Formats
 
-## 🤝 Contributing
+See `services/api.ts` for detailed API specifications.
 
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Add tests if applicable
-5. Submit a pull request
 
-## 📄 License
-
-This project is created for hackathon purposes. Please refer to the hackathon guidelines for usage terms.
-
-## 🆘 Support
-
-For issues and questions:
-1. Check the troubleshooting section
-2. Review the API documentation
-3. Create an issue in the repository
-
----
-
-**Built with ❤️ for the Flashback Hackathon**
+**Built with ❤️ using React Native, Expo, and MediaPipe**

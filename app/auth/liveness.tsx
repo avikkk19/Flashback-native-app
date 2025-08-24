@@ -124,7 +124,7 @@ export default function LivenessScreen() {
     setBlinkCount(0);
     setFaceDetected(false);
 
-    const startTime = Date.now();
+      const startTime = Date.now();
     const totalDuration = 8000; // 8 seconds
 
     try {
@@ -198,23 +198,23 @@ export default function LivenessScreen() {
       }
     } catch (error: any) {
       console.error('Liveness check error:', error);
-      Alert.alert(
+        Alert.alert(
         'Error', 
         error.message || 'Liveness check failed. Please try again.',
-        [
-          {
-            text: 'Try Again',
-            onPress: () => {
+          [
+            {
+              text: 'Try Again',
+              onPress: () => {
               resetLivenessCheck();
+              },
             },
-          },
-          {
-            text: 'Go Back',
-            onPress: () => router.back(),
-            style: 'cancel',
-          },
-        ]
-      );
+            {
+              text: 'Go Back',
+              onPress: () => router.back(),
+              style: 'cancel',
+            },
+          ]
+        );
     } finally {
       setIsChecking(false);
     }
@@ -319,6 +319,44 @@ export default function LivenessScreen() {
     <SafeAreaView style={styles.container}>
       <StatusBar style="light" />
       
+      {/* Header with Skip Button */}
+      <View style={styles.header}>
+        <TouchableOpacity
+          style={styles.backButton}
+          onPress={() => router.back()}
+        >
+          <Text style={styles.backButtonText}>← Back</Text>
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>Liveness Check</Text>
+        <TouchableOpacity
+          style={styles.skipHeaderButton}
+          onPress={() => {
+            Alert.alert(
+              'Skip Liveness Check',
+              'Skip the liveness check and go directly to selfie capture?',
+              [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                  text: 'Skip',
+                  style: 'destructive',
+                  onPress: async () => {
+                    try {
+                      await completeLiveness();
+                      console.log('[LIVENESS] Skipped via header button');
+                      router.replace('/auth/selfie');
+                    } catch (error) {
+                      console.error('[LIVENESS] Error skipping:', error);
+                    }
+                  },
+                },
+              ]
+            );
+          }}
+        >
+          <Text style={styles.skipHeaderButtonText}>Skip</Text>
+        </TouchableOpacity>
+      </View>
+      
       {/* Camera Preview */}
       <View style={styles.cameraContainer}>
         <CameraView
@@ -332,21 +370,21 @@ export default function LivenessScreen() {
         />
         
         {/* Overlay positioned absolutely over camera */}
-        <View style={styles.overlay}>
-          {/* Progress Bar */}
-          {isChecking && (
-            <View style={styles.progressContainer}>
-              <View style={styles.progressBar}>
-                <View 
-                  style={[
-                    styles.progressFill, 
-                    { width: `${checkProgress}%` }
-                  ]} 
-                />
-              </View>
-              <Text style={styles.progressText}>
+          <View style={styles.overlay}>
+            {/* Progress Bar */}
+            {isChecking && (
+              <View style={styles.progressContainer}>
+                <View style={styles.progressBar}>
+                  <View 
+                    style={[
+                      styles.progressFill, 
+                      { width: `${checkProgress}%` }
+                    ]} 
+                  />
+                </View>
+                <Text style={styles.progressText}>
                 Analyzing liveness... {Math.round(checkProgress)}%
-              </Text>
+                </Text>
               
               {/* Real-time Face Detection Status */}
               <View style={styles.faceStatusContainer}>
@@ -357,7 +395,7 @@ export default function LivenessScreen() {
                 ]}>
                   <Text style={styles.faceStatusText}>
                     {faceDetected ? '✓ FACE DETECTED' : '✗ NO FACE'}
-                  </Text>
+                </Text>
                 </View>
                 <Text style={styles.faceStatusConfidence}>
                   Confidence: {Math.round(detectionConfidence * 100)}%
@@ -400,15 +438,15 @@ export default function LivenessScreen() {
                   <Text style={styles.debugText}>Status: {currentStatus}</Text>
                 </View>
               )}
-            </View>
-          )}
+              </View>
+            )}
 
-          {/* Face Frame */}
-          <View style={styles.faceFrame}>
-            <View style={styles.corner} />
-            <View style={[styles.corner, styles.cornerTopRight]} />
-            <View style={[styles.corner, styles.cornerBottomLeft]} />
-            <View style={[styles.corner, styles.cornerBottomRight]} />
+            {/* Face Frame */}
+            <View style={styles.faceFrame}>
+              <View style={styles.corner} />
+              <View style={[styles.corner, styles.cornerTopRight]} />
+              <View style={[styles.corner, styles.cornerBottomLeft]} />
+              <View style={[styles.corner, styles.cornerBottomRight]} />
             
             {/* Face Detection Indicator - Always Visible */}
             <View style={[
@@ -422,15 +460,15 @@ export default function LivenessScreen() {
                 Confidence: {Math.round(detectionConfidence * 100)}%
               </Text>
             </View>
-          </View>
+            </View>
 
-          {/* Instructions */}
-          {!isChecking && (
-            <View style={styles.instructionsContainer}>
-              <Text style={styles.instructionsTitle}>Liveness Check</Text>
-              <Text style={styles.instructionsSubtitle}>
-                Position your face in the frame and blink naturally
-              </Text>
+            {/* Instructions */}
+            {!isChecking && (
+              <View style={styles.instructionsContainer}>
+                <Text style={styles.instructionsTitle}>Liveness Check</Text>
+                <Text style={styles.instructionsSubtitle}>
+                  Position your face in the frame and blink naturally
+                </Text>
               
               {/* Test Face Detection Button */}
               <TouchableOpacity
@@ -467,21 +505,21 @@ export default function LivenessScreen() {
               >
                 <Text style={styles.testButtonText}>Refresh State</Text>
               </TouchableOpacity>
-            </View>
-          )}
-          
-          {/* Real-time Status */}
-          {isChecking && (
-            <View style={styles.statusContainer}>
-              <Text style={styles.statusText}>
+              </View>
+            )}
+            
+            {/* Real-time Status */}
+            {isChecking && (
+              <View style={styles.statusContainer}>
+                <Text style={styles.statusText}>
                 {currentStatus}
               </Text>
               <Text style={styles.detailedStatus}>
                 Position: {facePosition} | Size: {faceSize}
-              </Text>
-            </View>
-          )}
-        </View>
+                </Text>
+              </View>
+            )}
+          </View>
       </View>
 
       {/* Controls */}
@@ -498,6 +536,42 @@ export default function LivenessScreen() {
                   • {instruction}
                 </Text>
               ))}
+              
+              {/* Quick Skip Option */}
+              <View style={styles.quickSkipContainer}>
+                <Text style={[styles.quickSkipText, { color: Colors[colorScheme ?? 'light'].tabIconDefault }]}>
+                  Want to skip this step?
+                </Text>
+                <TouchableOpacity
+                  style={[styles.quickSkipButton, { borderColor: Colors[colorScheme ?? 'light'].tabIconDefault }]}
+                  onPress={() => {
+                    Alert.alert(
+                      'Quick Skip',
+                      'Skip liveness check and go to selfie?',
+                      [
+                        { text: 'No, Continue', style: 'cancel' },
+                        {
+                          text: 'Yes, Skip',
+                          style: 'destructive',
+                          onPress: async () => {
+                            try {
+                              await completeLiveness();
+                              console.log('[LIVENESS] Quick skipped');
+                              router.replace('/auth/selfie');
+                            } catch (error) {
+                              console.error('[LIVENESS] Quick skip error:', error);
+                            }
+                          },
+                        },
+                      ]
+                    );
+                  }}
+                >
+                  <Text style={[styles.quickSkipButtonText, { color: Colors[colorScheme ?? 'light'].tabIconDefault }]}>
+                    Skip Liveness Check
+                  </Text>
+                </TouchableOpacity>
+              </View>
               
               <Text style={[styles.sectionTitle, { color: Colors[colorScheme ?? 'light'].text, marginTop: 16 }]}>
                 Tips
@@ -517,6 +591,49 @@ export default function LivenessScreen() {
                 disabled={isInitializing}
               >
                 <Text style={styles.buttonText}>Start Liveness Check</Text>
+              </TouchableOpacity>
+              
+              {/* Skip Liveness Button */}
+              <TouchableOpacity
+                style={[
+                  styles.skipButton, 
+                  { 
+                    borderColor: Colors[colorScheme ?? 'light'].tabIconDefault,
+                    marginTop: 12
+                  }
+                ]}
+                onPress={() => {
+                  Alert.alert(
+                    'Skip Liveness Check',
+                    'Are you sure you want to skip the liveness check? You will proceed directly to selfie capture.',
+                    [
+                      {
+                        text: 'Cancel',
+                        style: 'cancel',
+                      },
+                      {
+                        text: 'Skip',
+                        style: 'destructive',
+                        onPress: async () => {
+                          try {
+                            // Mark liveness as completed
+                            await completeLiveness();
+                            console.log('[LIVENESS] Skipped liveness check, proceeding to selfie');
+                            // Navigate to selfie screen
+                            router.replace('/auth/selfie');
+                          } catch (error) {
+                            console.error('[LIVENESS] Error skipping liveness:', error);
+                            Alert.alert('Error', 'Failed to skip liveness check. Please try again.');
+                          }
+                        },
+                      },
+                    ]
+                  );
+                }}
+              >
+                <Text style={[styles.skipButtonText, { color: Colors[colorScheme ?? 'light'].tabIconDefault }]}>
+                  Skip Liveness Check
+                </Text>
               </TouchableOpacity>
             </View>
           </>
@@ -882,5 +999,74 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: 12,
     marginBottom: 4,
+  },
+  skipButton: {
+    height: 40,
+    borderRadius: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'transparent', // Initially transparent, will be colored by theme
+  },
+  skipButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingTop: 40,
+    paddingBottom: 10,
+    backgroundColor: 'transparent', // Ensure it's transparent to allow camera preview to show through
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 10,
+  },
+  backButton: {
+    padding: 8,
+  },
+  backButtonText: {
+    color: 'white',
+    fontSize: 16,
+  },
+  headerTitle: {
+    color: 'white',
+    fontSize: 20,
+    fontWeight: 'bold',
+    textAlign: 'center',
+  },
+  skipHeaderButton: {
+    padding: 8,
+  },
+  skipHeaderButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  quickSkipContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 12,
+    marginBottom: 8,
+  },
+  quickSkipText: {
+    fontSize: 14,
+    marginRight: 8,
+  },
+  quickSkipButton: {
+    height: 36,
+    borderRadius: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    paddingHorizontal: 15,
+  },
+  quickSkipButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
   },
 });

@@ -1,24 +1,31 @@
+import { LinearGradient } from 'expo-linear-gradient';
 import { StatusBar } from 'expo-status-bar';
-import React from 'react';
+import React, { useState } from 'react';
 import {
     Alert,
+    Animated,
+    Dimensions,
     Image,
+    Modal,
     ScrollView,
     StyleSheet,
+    Text,
     TouchableOpacity,
-    View
+    View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { ThemedText } from '@/components/ThemedText';
-import { ThemedView } from '@/components/ThemedView';
 import { Colors } from '@/constants/Colors';
 import { useAuth } from '@/contexts/AuthContext';
 import { useColorScheme } from '@/hooks/useColorScheme';
 
+const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
+
 export default function HomeScreen() {
   const colorScheme = useColorScheme();
   const { user, logout } = useAuth();
+  const [showFullSelfie, setShowFullSelfie] = useState(false);
+  const [fadeAnim] = useState(new Animated.Value(0));
 
   /**
    * Handle logout
@@ -44,6 +51,31 @@ export default function HomeScreen() {
     );
   };
 
+  /**
+   * Show full selfie modal
+   */
+  const showSelfieModal = () => {
+    setShowFullSelfie(true);
+    Animated.timing(fadeAnim, {
+      toValue: 1,
+      duration: 300,
+      useNativeDriver: true,
+    }).start();
+  };
+
+  /**
+   * Hide full selfie modal
+   */
+  const hideSelfieModal = () => {
+    Animated.timing(fadeAnim, {
+      toValue: 0,
+      duration: 300,
+      useNativeDriver: true,
+    }).start(() => {
+      setShowFullSelfie(false);
+    });
+  };
+
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: Colors[colorScheme ?? 'light'].background }]}>
       <StatusBar style={colorScheme === 'dark' ? 'light' : 'dark'} />
@@ -53,124 +85,186 @@ export default function HomeScreen() {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* Header */}
-        <View style={styles.header}>
-          <ThemedText style={styles.title}>Welcome to Flashback!</ThemedText>
-          <ThemedText style={styles.subtitle}>
-            Your authentication journey is complete
-          </ThemedText>
+        {/* Welcome Header */}
+        <View style={styles.welcomeHeader}>
+          <LinearGradient
+            colors={colorScheme === 'dark' 
+              ? ['#1a1a1a', '#2d2d2d'] 
+              : ['#667eea', '#764ba2']
+            }
+            style={styles.gradientHeader}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+          >
+            <Text style={styles.welcomeTitle}>Welcome Back! 👋</Text>
+            <Text style={styles.welcomeSubtitle}>
+              Your authentication journey is complete
+            </Text>
+          </LinearGradient>
         </View>
 
-        {/* User Info Card */}
-        <ThemedView style={styles.userCard}>
-          <View style={styles.userInfo}>
-            <ThemedText style={styles.userTitle}>User Information</ThemedText>
-            
-            <View style={styles.infoRow}>
-              <ThemedText style={styles.infoLabel}>Phone Number:</ThemedText>
-              <ThemedText style={styles.infoValue}>
-                {user?.phoneNumber || 'Not available'}
-              </ThemedText>
+        {/* User Profile Card */}
+        <View style={styles.profileCard}>
+          <View style={styles.profileHeader}>
+            <View style={styles.profileAvatar}>
+              {user?.selfieUrl ? (
+                <TouchableOpacity onPress={showSelfieModal}>
+                  <Image 
+                    source={{ uri: user.selfieUrl }} 
+                    style={styles.avatarImage}
+                    resizeMode="cover"
+                  />
+                  <View style={styles.avatarOverlay}>
+                    <Text style={styles.avatarOverlayText}>👆 Tap to view</Text>
+                  </View>
+                </TouchableOpacity>
+              ) : (
+                <View style={styles.avatarPlaceholder}>
+                  <Text style={styles.avatarPlaceholderText}>📷</Text>
+                </View>
+              )}
             </View>
-
-            <View style={styles.infoRow}>
-              <ThemedText style={styles.infoLabel}>Username:</ThemedText>
-              <ThemedText style={styles.infoValue}>
-                {user?.username || 'Not available'}
-              </ThemedText>
-            </View>
-
-            <View style={styles.infoRow}>
-              <ThemedText style={styles.infoLabel}>Status:</ThemedText>
-              <View style={styles.statusContainer}>
-                <View style={styles.statusDot} />
-                <ThemedText style={styles.statusText}>Verified</ThemedText>
+            <View style={styles.profileInfo}>
+              <Text style={styles.profileName}>
+                {user?.username || 'User'}
+              </Text>
+              <Text style={styles.profilePhone}>
+                {user?.phoneNumber || 'Phone not available'}
+              </Text>
+              <View style={styles.verificationBadge}>
+                <Text style={styles.verificationText}>✓ Verified</Text>
               </View>
             </View>
           </View>
-        </ThemedView>
+        </View>
 
-        {/* Selfie Section */}
-        <ThemedView style={styles.selfieCard}>
-          <ThemedText style={styles.selfieTitle}>Your Selfie</ThemedText>
-          
-          {user?.selfieUrl ? (
-            <View style={styles.selfieContainer}>
-              <Image 
-                source={{ uri: user.selfieUrl }} 
-                style={styles.selfieImage}
-                resizeMode="cover"
-              />
-              <ThemedText style={styles.selfieCaption}>
-                Successfully uploaded and verified
-              </ThemedText>
-            </View>
-          ) : (
-            <View style={styles.noSelfieContainer}>
-              <View style={styles.noSelfieIcon}>
-                <ThemedText style={styles.noSelfieIconText}>📷</ThemedText>
+        {/* Selfie Display Section */}
+        {user?.selfieUrl && (
+          <View style={styles.selfieSection}>
+            <Text style={styles.sectionTitle}>Your Profile Picture</Text>
+            <TouchableOpacity 
+              style={styles.selfieContainer}
+              onPress={showSelfieModal}
+              activeOpacity={0.9}
+            >
+              <View style={styles.selfieFrame}>
+                <Image 
+                  source={{ uri: user.selfieUrl }} 
+                  style={styles.selfieImage}
+                  resizeMode="cover"
+                />
+                <View style={styles.selfieFrameBorder} />
+                <View style={styles.selfieFrameShadow} />
               </View>
-              <ThemedText style={styles.noSelfieText}>
-                No selfie uploaded yet
-              </ThemedText>
-              <ThemedText style={styles.noSelfieSubtext}>
-                Complete the authentication flow to upload your selfie
-              </ThemedText>
-            </View>
-          )}
-        </ThemedView>
+              <View style={styles.selfieInfo}>
+                <Text style={styles.selfieCaption}>Tap to view full size</Text>
+                <Text style={styles.selfieStatus}>✓ Successfully uploaded</Text>
+              </View>
+            </TouchableOpacity>
+          </View>
+        )}
 
-        {/* Authentication Flow Summary */}
-        <ThemedView style={styles.summaryCard}>
-          <ThemedText style={styles.summaryTitle}>Authentication Summary</ThemedText>
+        {/* Authentication Summary */}
+        <View style={styles.summarySection}>
+          <Text style={styles.sectionTitle}>Authentication Summary</Text>
           
-          <View style={styles.stepContainer}>
-            <View style={styles.stepNumber}>
-              <ThemedText style={styles.stepNumberText}>1</ThemedText>
+          <View style={styles.stepsContainer}>
+            <View style={styles.stepItem}>
+              <View style={[styles.stepIcon, { backgroundColor: '#4CAF50' }]}>
+                <Text style={styles.stepIconText}>✓</Text>
+              </View>
+              <View style={styles.stepContent}>
+                <Text style={styles.stepTitle}>Phone Verification</Text>
+                <Text style={styles.stepDescription}>OTP verified successfully</Text>
+              </View>
             </View>
-            <View style={styles.stepContent}>
-              <ThemedText style={styles.stepTitle}>Phone Verification</ThemedText>
-              <ThemedText style={styles.stepDescription}>
-                Successfully verified your phone number with OTP
-              </ThemedText>
+
+            <View style={styles.stepItem}>
+              <View style={[styles.stepIcon, { backgroundColor: '#4CAF50' }]}>
+                <Text style={styles.stepIconText}>✓</Text>
+              </View>
+              <View style={styles.stepContent}>
+                <Text style={styles.stepTitle}>Liveness Check</Text>
+                <Text style={styles.stepDescription}>On-device detection completed</Text>
+              </View>
+            </View>
+
+            <View style={styles.stepItem}>
+              <View style={[styles.stepIcon, { backgroundColor: user?.selfieUrl ? '#4CAF50' : '#FF9800' }]}>
+                <Text style={styles.stepIconText}>{user?.selfieUrl ? '✓' : '📷'}</Text>
+              </View>
+              <View style={styles.stepContent}>
+                <Text style={styles.stepTitle}>Selfie Upload</Text>
+                <Text style={styles.stepDescription}>
+                  {user?.selfieUrl ? 'Successfully uploaded to backend' : 'Upload pending'}
+                </Text>
+              </View>
             </View>
           </View>
+        </View>
 
-          <View style={styles.stepContainer}>
-            <View style={styles.stepNumber}>
-              <ThemedText style={styles.stepNumberText}>2</ThemedText>
-            </View>
-            <View style={styles.stepContent}>
-              <ThemedText style={styles.stepTitle}>Liveness Check</ThemedText>
-              <ThemedText style={styles.stepDescription}>
-                Completed on-device liveness detection
-              </ThemedText>
-            </View>
-          </View>
+        {/* Action Buttons */}
+        <View style={styles.actionsSection}>
+          <TouchableOpacity
+            style={[styles.actionButton, { backgroundColor: Colors[colorScheme ?? 'light'].tint }]}
+            onPress={() => {
+              // Add any additional actions here
+              Alert.alert('Action', 'This feature is coming soon!');
+            }}
+          >
+            <Text style={styles.actionButtonText}>Continue to App</Text>
+          </TouchableOpacity>
 
-          <View style={styles.stepContainer}>
-            <View style={styles.stepNumber}>
-              <ThemedText style={styles.stepNumberText}>3</ThemedText>
-            </View>
-            <View style={styles.stepContent}>
-              <ThemedText style={styles.stepTitle}>Selfie Upload</ThemedText>
-              <ThemedText style={styles.stepDescription}>
-                {user?.selfieUrl ? 'Successfully uploaded selfie to backend' : 'Selfie upload pending'}
-              </ThemedText>
-            </View>
-          </View>
-        </ThemedView>
-
-        {/* Logout Button */}
-        <TouchableOpacity
-          style={[styles.logoutButton, { borderColor: Colors[colorScheme ?? 'light'].tabIconDefault }]}
-          onPress={handleLogout}
-        >
-          <ThemedText style={[styles.logoutButtonText, { color: Colors[colorScheme ?? 'light'].tabIconDefault }]}>
-            Logout
-          </ThemedText>
-        </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.logoutButton, { borderColor: Colors[colorScheme ?? 'light'].tabIconDefault }]}
+            onPress={handleLogout}
+          >
+            <Text style={[styles.logoutButtonText, { color: Colors[colorScheme ?? 'light'].tabIconDefault }]}>
+              Logout
+            </Text>
+          </TouchableOpacity>
+        </View>
       </ScrollView>
+
+      {/* Full Selfie Modal */}
+      <Modal
+        visible={showFullSelfie}
+        transparent={true}
+        animationType="none"
+        onRequestClose={hideSelfieModal}
+      >
+        <Animated.View 
+          style={[
+            styles.modalOverlay,
+            { opacity: fadeAnim }
+          ]}
+        >
+          <TouchableOpacity 
+            style={styles.modalBackground}
+            onPress={hideSelfieModal}
+            activeOpacity={1}
+          >
+            <View style={styles.modalContent}>
+              <TouchableOpacity 
+                style={styles.fullSelfieContainer}
+                onPress={() => {}} // Prevent closing when tapping image
+                activeOpacity={1}
+              >
+                <Image 
+                  source={{ uri: user?.selfieUrl }} 
+                  style={styles.fullSelfieImage}
+                  resizeMode="contain"
+                />
+                <View style={styles.modalCloseButton}>
+                  <TouchableOpacity onPress={hideSelfieModal}>
+                    <Text style={styles.modalCloseText}>✕</Text>
+                  </TouchableOpacity>
+                </View>
+              </TouchableOpacity>
+            </View>
+          </TouchableOpacity>
+        </Animated.View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -187,159 +281,186 @@ const styles = StyleSheet.create({
     paddingTop: 20,
     paddingBottom: 40,
   },
-  header: {
-    alignItems: 'center',
+  welcomeHeader: {
     marginBottom: 32,
+    paddingHorizontal: 24,
   },
-  title: {
+  gradientHeader: {
+    borderRadius: 20,
+    padding: 24,
+    alignItems: 'center',
+  },
+  welcomeTitle: {
     fontSize: 28,
     fontWeight: 'bold',
+    color: 'white',
     marginBottom: 8,
     textAlign: 'center',
   },
-  subtitle: {
+  welcomeSubtitle: {
     fontSize: 16,
+    color: 'rgba(255, 255, 255, 0.8)',
     textAlign: 'center',
     lineHeight: 24,
-    opacity: 0.8,
   },
-  userCard: {
-    borderRadius: 16,
-    padding: 20,
+  profileCard: {
+    borderRadius: 20,
+    padding: 24,
     marginBottom: 20,
+    backgroundColor: '#f8f8f8',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 8,
     elevation: 3,
   },
-  userInfo: {
-    gap: 16,
+  profileHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
   },
-  userTitle: {
-    fontSize: 18,
+  profileAvatar: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    overflow: 'hidden',
+    marginRight: 16,
+  },
+  avatarImage: {
+    width: '100%',
+    height: '100%',
+  },
+  avatarOverlay: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderBottomLeftRadius: 20,
+    borderBottomRightRadius: 20,
+  },
+  avatarOverlayText: {
+    color: 'white',
+    fontSize: 12,
     fontWeight: '600',
+  },
+  avatarPlaceholder: {
+    width: '100%',
+    height: '100%',
+    backgroundColor: '#e0e0e0',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderRadius: 40,
+  },
+  avatarPlaceholderText: {
+    fontSize: 32,
+  },
+  profileInfo: {
+    flex: 1,
+  },
+  profileName: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    marginBottom: 4,
+  },
+  profilePhone: {
+    fontSize: 14,
+    color: '#666',
     marginBottom: 8,
   },
-  infoRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+  verificationBadge: {
+    backgroundColor: '#e0f2f7',
+    borderRadius: 12,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    alignSelf: 'flex-start',
   },
-  infoLabel: {
-    fontSize: 14,
-    fontWeight: '500',
-    opacity: 0.7,
-  },
-  infoValue: {
-    fontSize: 14,
+  verificationText: {
+    fontSize: 12,
     fontWeight: '600',
+    color: '#007bff',
   },
-  statusContainer: {
-    flexDirection: 'row',
+  selfieSection: {
+    marginBottom: 20,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    marginBottom: 16,
+    paddingHorizontal: 24,
+  },
+  selfieContainer: {
     alignItems: 'center',
-    gap: 8,
+    paddingHorizontal: 24,
   },
-  statusDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: '#4CAF50',
+  selfieFrame: {
+    width: screenWidth * 0.8,
+    height: screenWidth * 0.8,
+    borderRadius: 20,
+    overflow: 'hidden',
+    position: 'relative',
   },
-  statusText: {
+  selfieImage: {
+    width: '100%',
+    height: '100%',
+  },
+  selfieFrameBorder: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    borderWidth: 2,
+    borderColor: '#fff',
+    borderRadius: 20,
+  },
+  selfieFrameShadow: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.2)',
+    borderRadius: 20,
+  },
+  selfieInfo: {
+    alignItems: 'center',
+    marginTop: 12,
+  },
+  selfieCaption: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 4,
+  },
+  selfieStatus: {
     fontSize: 14,
     fontWeight: '600',
     color: '#4CAF50',
   },
-  selfieCard: {
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 3,
-  },
-  selfieTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    marginBottom: 16,
-  },
-  selfieContainer: {
-    alignItems: 'center',
-  },
-  selfieImage: {
-    width: 200,
-    height: 200,
-    borderRadius: 100,
-    marginBottom: 12,
-  },
-  selfieCaption: {
-    fontSize: 14,
-    opacity: 0.7,
-    textAlign: 'center',
-  },
-  noSelfieContainer: {
-    alignItems: 'center',
-    paddingVertical: 20,
-  },
-  noSelfieIcon: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: '#f0f0f0',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  noSelfieIconText: {
-    fontSize: 32,
-  },
-  noSelfieText: {
-    fontSize: 16,
-    fontWeight: '600',
-    marginBottom: 8,
-  },
-  noSelfieSubtext: {
-    fontSize: 14,
-    opacity: 0.7,
-    textAlign: 'center',
-  },
-  summaryCard: {
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 3,
-  },
-  summaryTitle: {
-    fontSize: 18,
-    fontWeight: '600',
+  summarySection: {
     marginBottom: 20,
   },
-  stepContainer: {
+  stepsContainer: {
+    paddingHorizontal: 24,
+  },
+  stepItem: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
+    alignItems: 'center',
     marginBottom: 16,
   },
-  stepNumber: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: '#4CAF50',
+  stepIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 16,
-    marginTop: 2,
   },
-  stepNumberText: {
+  stepIconText: {
+    fontSize: 20,
     color: 'white',
-    fontSize: 16,
-    fontWeight: 'bold',
   },
   stepContent: {
     flex: 1,
@@ -351,8 +472,23 @@ const styles = StyleSheet.create({
   },
   stepDescription: {
     fontSize: 14,
-    opacity: 0.7,
+    color: '#666',
     lineHeight: 20,
+  },
+  actionsSection: {
+    paddingHorizontal: 24,
+  },
+  actionButton: {
+    height: 56,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  actionButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: 'white',
   },
   logoutButton: {
     height: 56,
@@ -360,10 +496,51 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 1,
-    marginTop: 20,
   },
   logoutButtonText: {
     fontSize: 16,
     fontWeight: '600',
+  },
+  modalOverlay: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.7)',
+  },
+  modalBackground: {
+    flex: 1,
+  },
+  modalContent: {
+    width: screenWidth * 0.9,
+    height: screenHeight * 0.8,
+    backgroundColor: 'transparent',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  fullSelfieContainer: {
+    width: '100%',
+    height: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  fullSelfieImage: {
+    width: '100%',
+    height: '100%',
+    resizeMode: 'contain',
+  },
+  modalCloseButton: {
+    position: 'absolute',
+    top: 20,
+    right: 20,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    borderRadius: 20,
+    width: 40,
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalCloseText: {
+    fontSize: 24,
+    color: 'white',
   },
 });

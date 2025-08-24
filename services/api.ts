@@ -190,6 +190,11 @@ export interface UploadSelfieResponse {
   success: boolean;
   message?: string;
   error?: string;
+  data?: {
+    s3Url?: string;
+    secondaryUrl?: string;
+    user_id?: string;
+  };
   imageUrl?: string;
   portraitUrl?: string;
 }
@@ -352,7 +357,15 @@ export class AuthService {
       });
 
       console.log(`[API] Selfie uploaded successfully:`, response.data);
-      return response.data;
+      
+      // Format the response to match expected structure
+      const formattedResponse: UploadSelfieResponse = {
+        success: true, // Always true if we reach here
+        message: response.data?.message || 'Selfie uploaded successfully',
+        data: response.data,
+      };
+      
+      return formattedResponse;
     } catch (error: any) {
       console.error('[API] Upload selfie error:', error);
       

@@ -3,15 +3,15 @@ import { router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import React, { useEffect, useRef, useState } from 'react';
 import {
-    ActivityIndicator,
-    Alert,
-    Dimensions,
-    Image,
-    SafeAreaView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Alert,
+  Dimensions,
+  Image,
+  SafeAreaView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 
 import { Colors } from '@/constants/Colors';
@@ -189,17 +189,35 @@ export default function SelfieScreen() {
       );
 
       console.log('[SELFIE] Upload response:', response);
+      console.log('[SELFIE] Response structure analysis:', {
+        hasSuccess: !!response.success,
+        hasData: !!response.data,
+        hasS3Url: !!response.data?.s3Url,
+        hasSecondaryUrl: !!response.data?.secondaryUrl,
+        message: response.message,
+        messageIncludesSuccess: response.message?.includes('successfully'),
+        isSuccessful: false // Will be calculated below
+      });
 
-      if (response.success) {
+      // Check if upload was successful based on response structure
+      const isSuccessful = response.success || 
+                          (response.data && (response.data.s3Url || response.data.secondaryUrl)) ||
+                          response.message?.includes('successfully');
+
+      console.log('[SELFIE] Success detection result:', isSuccessful);
+
+      if (isSuccessful) {
         // Save selfie URL to user context
-        if (response.imageUrl || response.portraitUrl) {
-          const selfieUrl = response.imageUrl || response.portraitUrl;
+        if (response.data?.s3Url || response.data?.secondaryUrl) {
+          const selfieUrl = response.data.s3Url || response.data.secondaryUrl;
           if (selfieUrl) {
             await setSelfieUrl(selfieUrl);
             console.log('[SELFIE] Selfie URL saved to context:', selfieUrl);
           }
         }
 
+        setUploadProgress(100);
+        
         Alert.alert(
           'Success! 🎉',
           'Your selfie has been uploaded successfully. You can now proceed to the main app.',
@@ -269,7 +287,14 @@ export default function SelfieScreen() {
       <View style={styles.header}>
         <TouchableOpacity
           style={styles.backButton}
-          onPress={() => router.back()}
+          onPress={() => {
+            // Check if we can go back, otherwise go to phone screen
+            if (router.canGoBack()) {
+              router.back();
+            } else {
+              router.replace('/auth/phone');
+            }
+          }}
         >
           <Text style={styles.backButtonText}>← Back</Text>
         </TouchableOpacity>
@@ -377,6 +402,14 @@ export default function SelfieScreen() {
                 <Text style={styles.progressText}>
                   Uploading... {uploadProgress}%
                 </Text>
+              </View>
+            )}
+
+            {/* Success Indicator */}
+            {!isUploading && uploadProgress === 100 && !uploadError && (
+              <View style={styles.successContainer}>
+                <Text style={styles.successText}>✅ Upload Successful!</Text>
+                <Text style={styles.successSubtext}>Your selfie has been uploaded and processed.</Text>
               </View>
             )}
 
@@ -908,5 +941,28 @@ const styles = StyleSheet.create({
   logoutButtonText: {
     fontSize: 16,
     color: '#333',
+  },
+  successContainer: {
+    backgroundColor: '#e8f5e9',
+    paddingVertical: 15,
+    paddingHorizontal: 20,
+    borderRadius: 12,
+    marginBottom: 20,
+    alignSelf: 'stretch',
+    borderWidth: 1,
+    borderColor: '#4caf50',
+    marginHorizontal: 20,
+  },
+  successText: {
+    color: '#2e7d32',
+    fontSize: 18,
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+  successSubtext: {
+    color: '#4caf50',
+    fontSize: 14,
+    textAlign: 'center',
+    marginTop: 4,
   },
 });
