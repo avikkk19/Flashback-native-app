@@ -22,7 +22,7 @@ export const ENVIRONMENT = {
   
   // Timeouts
   OTP_TIMEOUT: 30000, // 30 seconds
-  LIVENESS_CHECK_DURATION: 5000, // 5 seconds
+  LIVENESS_CHECK_DURATION: 8000, // 8 seconds
   UPLOAD_TIMEOUT: 60000, // 60 seconds
   
   // Validation
@@ -32,13 +32,34 @@ export const ENVIRONMENT = {
   // UI Configuration
   ANIMATION_DURATION: 300,
   DEBOUNCE_DELAY: 500,
+  
+  // API Endpoints
+  ENDPOINTS: {
+    SEND_OTP: '/sendOTP',
+    VERIFY_OTP: '/verifyOTP',
+    UPLOAD_SELFIE: '/uploadUserPortrait',
+  },
+  
+  // File Upload Configuration
+  UPLOAD: {
+    MAX_FILE_SIZE: 10 * 1024 * 1024, // 10MB
+    ALLOWED_TYPES: ['image/jpeg', 'image/png', 'image/jpg'],
+    COMPRESSION_QUALITY: 0.8,
+  },
 };
 
 // Development overrides
 if (__DEV__) {
   ENVIRONMENT.ENABLE_DEV_SKIP_OPTIONS = false; // Disable skip options in production
   ENVIRONMENT.USE_MOCK_API = false; // Use real API
-  ENVIRONMENT.API_BASE_URL = 'https://flashback.inc:9000/api/mobile'; // Keep same for consistency
+  
+  // For development, you can override the API URL here
+  // ENVIRONMENT.API_BASE_URL = 'http://localhost:9000/api/mobile';
+  
+  // Enable more verbose logging in development
+  console.log('[ENV] Development mode enabled');
+  console.log('[ENV] API Base URL:', ENVIRONMENT.API_BASE_URL);
+  console.log('[ENV] Refresh Token:', ENVIRONMENT.REFRESH_TOKEN ? 'Present' : 'Missing');
 }
 
 export default ENVIRONMENT;

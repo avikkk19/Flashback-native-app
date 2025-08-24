@@ -1,4 +1,4 @@
-import { Camera } from 'expo-camera';
+import { CameraView, useCameraPermissions } from 'expo-camera';
 import { router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import React, { useEffect, useRef, useState } from 'react';
@@ -17,75 +17,67 @@ import {
 import { Colors } from '@/constants/Colors';
 import { useAuth } from '@/contexts/AuthContext';
 import { useColorScheme } from '@/hooks/useColorScheme';
+import UnifiedAuthService from '@/services/unifiedApi';
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
 export default function SelfieScreen() {
   const colorScheme = useColorScheme();
   const { user, token, setSelfieUrl } = useAuth();
-  const cameraRef = useRef<Camera>(null);
+  const cameraRef = useRef<CameraView>(null);
+  const [permission, requestPermission] = useCameraPermissions();
   
-  const [hasPermission, setHasPermission] = useState<boolean | null>(null);
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [isCapturing, setIsCapturing] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<number>(0);
+  const [captureError, setCaptureError] = useState<string | null>(null);
+  const [uploadError, setUploadError] = useState<string | null>(null);
 
   useEffect(() => {
-    // Request camera permissions on mount
-    requestCameraPermission();
+    // Request camera permissions if not granted
+    if (!permission?.granted) {
+      requestPermission();
+    }
   }, []);
 
   /**
-   * Request camera permissions
-   */
-  const requestCameraPermission = async () => {
-    try {
-      const { status } = await Camera.requestCameraPermissionsAsync();
-      setHasPermission(status === 'granted');
-      
-      if (status !== 'granted') {
-        Alert.alert(
-          'Camera Permission Required',
-          'This app needs camera access to capture your selfie. Please grant camera permissions in your device settings.',
-          [
-            { text: 'Cancel', style: 'cancel' },
-            { text: 'Settings', onPress: () => router.back() },
-          ]
-        );
-      }
-    } catch (error) {
-      console.error('Error requesting camera permission:', error);
-      setHasPermission(false);
-      
-      // Show user-friendly error message
-      Alert.alert(
-        'Camera Access Error',
-        'Unable to access camera. Please ensure camera permissions are granted and try again.',
-        [
-          { text: 'OK', onPress: () => router.back() },
-        ]
-      );
-    }
-  };
-
-  /**
-   * Capture selfie
+   * Capture selfie with improved error handling
    */
   const captureSelfie = async () => {
     if (!cameraRef.current || isCapturing) return;
 
     setIsCapturing(true);
+    setCaptureError(null);
+    
     try {
+      console.log('[SELFIE] Starting photo capture...');
+      
       const photo = await cameraRef.current.takePictureAsync({
         quality: 0.8,
         base64: false,
         skipProcessing: false,
+        exif: false,
       });
 
+      console.log('[SELFIE] Photo captured successfully:', {
+        uri: photo.uri,
+        width: photo.width,
+        height: photo.height,
+      });
+
+      if (!photo.uri) {
+        throw new Error('Failed to capture photo - no URI returned');
+      }
+
       setCapturedImage(photo.uri);
-    } catch (error) {
-      console.error('Error capturing photo:', error);
-      Alert.alert('Error', 'Failed to capture photo. Please try again.');
+      console.log('[SELFIE] Selfie captured and stored');
+      
+    } catch (error: any) {
+      console.error('[SELFIE] Error capturing photo:', error);
+      const errorMessage = error.message || 'Failed to capture photo. Please try again.';
+      setCaptureError(errorMessage);
+      Alert.alert('Capture Error', errorMessage);
     } finally {
       setIsCapturing(false);
     }
@@ -96,34 +88,57 @@ export default function SelfieScreen() {
    */
   const retakeSelfie = () => {
     setCapturedImage(null);
+    setCaptureError(null);
+    setUploadError(null);
+    setUploadProgress(0);
   };
 
   /**
-   * Upload selfie to backend
+   * Upload selfie to backend with improved error handling
    */
   const uploadSelfie = async () => {
     if (!capturedImage || !user || !token) {
-      Alert.alert('Error', 'Missing required data for upload.');
+      const missingData = [];
+      if (!capturedImage) missingData.push('selfie image');
+      if (!user) missingData.push('user data');
+      if (!token) missingData.push('authentication token');
+      
+      Alert.alert('Error', `Missing required data: ${missingData.join(', ')}. Please try again.`);
       return;
     }
 
     setIsUploading(true);
+    setUploadError(null);
+    setUploadProgress(0);
+    
     try {
+      console.log('[SELFIE] Starting upload process...');
+      console.log('[SELFIE] User:', user.username);
+      console.log('[SELFIE] Token length:', token.length);
+      
       const response = await UnifiedAuthService.uploadSelfie(
         capturedImage,
         user.username,
         token
       );
 
+      console.log('[SELFIE] Upload response:', response);
+
       if (response.success) {
         // Save selfie URL to user context
-        if (response.imageUrl) {
-          await setSelfieUrl(response.imageUrl);
+        if (response.imageUrl || response.portraitUrl) {
+          const selfieUrl = response.imageUrl || response.portraitUrl;
+          if (selfieUrl) {
+            await setSelfieUrl(selfieUrl);
+            console.log('[SELFIE] Selfie URL saved to context:', selfieUrl);
+          }
         }
 
+        setUploadProgress(100);
+        
         Alert.alert(
-          'Success!',
-          'Your selfie has been uploaded successfully.',
+          'Success! 🎉',
+          'Your selfie has been uploaded successfully. You can now proceed to the main app.',
           [
             {
               text: 'Continue',
@@ -132,18 +147,22 @@ export default function SelfieScreen() {
           ]
         );
       } else {
-        Alert.alert('Upload Failed', response.message || 'Failed to upload selfie. Please try again.');
+        const errorMessage = response.message || response.error || 'Failed to upload selfie. Please try again.';
+        setUploadError(errorMessage);
+        Alert.alert('Upload Failed', errorMessage);
       }
     } catch (error: any) {
-      Alert.alert('Error', error.message || 'Failed to upload selfie. Please try again.');
+      console.error('[SELFIE] Upload error:', error);
+      const errorMessage = error.message || 'Failed to upload selfie. Please try again.';
+      setUploadError(errorMessage);
+      Alert.alert('Upload Error', errorMessage);
     } finally {
       setIsUploading(false);
     }
   };
 
-  // Skip functionality removed for production
-
-  if (hasPermission === null) {
+  // Show loading state while requesting permissions
+  if (!permission) {
     return (
       <SafeAreaView style={[styles.container, { backgroundColor: Colors[colorScheme ?? 'light'].background }]}>
         <View style={styles.loadingContainer}>
@@ -156,7 +175,8 @@ export default function SelfieScreen() {
     );
   }
 
-  if (hasPermission === false) {
+  // Show error state if camera permission denied
+  if (!permission?.granted) {
     return (
       <SafeAreaView style={[styles.container, { backgroundColor: Colors[colorScheme ?? 'light'].background }]}>
         <View style={styles.errorContainer}>
@@ -184,13 +204,17 @@ export default function SelfieScreen() {
       {/* Camera Preview or Captured Image */}
       <View style={styles.cameraContainer}>
         {capturedImage ? (
-          <Image source={{ uri: capturedImage }} style={styles.capturedImage} />
+          <Image 
+            source={{ uri: capturedImage }} 
+            style={styles.capturedImage}
+            resizeMode="cover"
+          />
         ) : (
-          <Camera
+          <CameraView
             ref={cameraRef}
             style={styles.camera}
-            type={CameraType.front}
-            ratio="16:9"
+            facing="front"
+            onCameraReady={() => console.log('[SELFIE] Camera ready')}
           >
             {/* Overlay */}
             <View style={styles.overlay}>
@@ -209,8 +233,15 @@ export default function SelfieScreen() {
                   Position your face in the frame and tap the camera button
                 </Text>
               </View>
+
+              {/* Error Display */}
+              {captureError && (
+                <View style={styles.errorBanner}>
+                  <Text style={styles.errorBannerText}>{captureError}</Text>
+                </View>
+              )}
             </View>
-          </Camera>
+          </CameraView>
         )}
       </View>
 
@@ -226,9 +257,40 @@ export default function SelfieScreen() {
               Make sure your face is clearly visible and well-lit
             </Text>
 
+            {/* Upload Progress */}
+            {isUploading && (
+              <View style={styles.progressContainer}>
+                <View style={styles.progressBar}>
+                  <View 
+                    style={[
+                      styles.progressFill, 
+                      { width: `${uploadProgress}%` }
+                    ]} 
+                  />
+                </View>
+                <Text style={styles.progressText}>
+                  Uploading... {uploadProgress}%
+                </Text>
+              </View>
+            )}
+
+            {/* Error Display */}
+            {uploadError && (
+              <View style={styles.errorMessage}>
+                <Text style={styles.errorMessageText}>{uploadError}</Text>
+              </View>
+            )}
+
             <View style={styles.buttonContainer}>
               <TouchableOpacity
-                style={[styles.button, { backgroundColor: Colors[colorScheme ?? 'light'].tint }]}
+                style={[
+                  styles.button, 
+                  { 
+                    backgroundColor: isUploading 
+                      ? Colors[colorScheme ?? 'light'].tabIconDefault 
+                      : Colors[colorScheme ?? 'light'].tint 
+                  }
+                ]}
                 onPress={uploadSelfie}
                 disabled={isUploading}
               >
@@ -240,7 +302,10 @@ export default function SelfieScreen() {
               </TouchableOpacity>
 
               <TouchableOpacity
-                style={[styles.secondaryButton, { borderColor: Colors[colorScheme ?? 'light'].tabIconDefault }]}
+                style={[
+                  styles.secondaryButton, 
+                  { borderColor: Colors[colorScheme ?? 'light'].tabIconDefault }
+                ]}
                 onPress={retakeSelfie}
                 disabled={isUploading}
               >
@@ -262,7 +327,14 @@ export default function SelfieScreen() {
 
             <View style={styles.buttonContainer}>
               <TouchableOpacity
-                style={[styles.captureButton, { backgroundColor: Colors[colorScheme ?? 'light'].tint }]}
+                style={[
+                  styles.captureButton, 
+                  { 
+                    backgroundColor: isCapturing 
+                      ? Colors[colorScheme ?? 'light'].tabIconDefault 
+                      : Colors[colorScheme ?? 'light'].tint 
+                  }
+                ]}
                 onPress={captureSelfie}
                 disabled={isCapturing}
               >
@@ -272,8 +344,6 @@ export default function SelfieScreen() {
                   <View style={styles.captureButtonInner} />
                 )}
               </TouchableOpacity>
-
-
             </View>
           </View>
         )}
@@ -475,5 +545,56 @@ const styles = StyleSheet.create({
   skipButtonText: {
     fontSize: 14,
     fontWeight: '500',
+  },
+  progressContainer: {
+    width: '100%',
+    marginBottom: 20,
+  },
+  progressBar: {
+    height: 8,
+    backgroundColor: '#e0e0e0',
+    borderRadius: 4,
+    overflow: 'hidden',
+  },
+  progressFill: {
+    height: '100%',
+    backgroundColor: '#4CAF50',
+    borderRadius: 4,
+  },
+  progressText: {
+    textAlign: 'center',
+    fontSize: 14,
+    color: '#333',
+    marginTop: 8,
+  },
+  errorBanner: {
+    backgroundColor: '#ffebee',
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 8,
+    marginBottom: 20,
+    alignSelf: 'stretch',
+    borderWidth: 1,
+    borderColor: '#ef5350',
+  },
+  errorBannerText: {
+    color: '#d32f2f',
+    fontSize: 14,
+    textAlign: 'center',
+  },
+  errorMessage: {
+    backgroundColor: '#ffebee',
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 8,
+    marginBottom: 20,
+    alignSelf: 'stretch',
+    borderWidth: 1,
+    borderColor: '#ef5350',
+  },
+  errorMessageText: {
+    color: '#d32f2f',
+    fontSize: 14,
+    textAlign: 'center',
   },
 });

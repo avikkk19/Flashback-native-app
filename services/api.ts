@@ -158,18 +158,35 @@ export class AuthService {
   ): Promise<UploadSelfieResponse> {
     try {
       console.log(`[API] Uploading selfie for ${username}`);
+      console.log(`[API] Image URI: ${imageUri}`);
+      
+      // Validate inputs
+      if (!imageUri || !username || !token) {
+        throw new Error('Missing required parameters for upload');
+      }
+
+      // Check if file exists
+      const fileInfo = await FileSystem.getInfoAsync(imageUri);
+      if (!fileInfo.exists) {
+        throw new Error('Image file not found. Please capture the image again.');
+      }
+
+      console.log(`[API] File info:`, fileInfo);
       
       // Create form data
       const formData = new FormData();
       
-      // Get file info
-      const fileInfo = await FileSystem.getInfoAsync(imageUri);
+      // Get file extension and determine MIME type
       const fileName = imageUri.split('/').pop() || 'selfie.jpg';
+      const fileExtension = fileName.split('.').pop()?.toLowerCase();
+      const mimeType = fileExtension === 'png' ? 'image/png' : 'image/jpeg';
       
-      // Append image file
+      console.log(`[API] File details - Name: ${fileName}, MIME: ${mimeType}, Size: ${fileInfo.size} bytes`);
+      
+      // Append image file with proper React Native format
       formData.append('image', {
         uri: imageUri,
-        type: 'image/jpeg',
+        type: mimeType,
         name: fileName,
       } as any);
       
@@ -187,11 +204,20 @@ export class AuthService {
         uploadHeaders['Cookie'] = `refreshToken=${REFRESH_TOKEN}`;
       }
 
+      console.log(`[API] Upload headers:`, uploadHeaders);
+      console.log(`[API] Making request to: ${API_BASE_URL}/uploadUserPortrait`);
+
       // Make request with authorization header
       const response = await axios.post(`${API_BASE_URL}/uploadUserPortrait`, formData, {
         headers: uploadHeaders,
         withCredentials: Platform.OS === 'web',
-        timeout: 30000, // 30 second timeout for upload
+        timeout: 60000, // 60 second timeout for upload
+        onUploadProgress: (progressEvent) => {
+          if (progressEvent.total) {
+            const progress = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+            console.log(`[API] Upload progress: ${progress}%`);
+          }
+        },
       });
 
       console.log(`[API] Selfie uploaded successfully:`, response.data);
@@ -199,18 +225,25 @@ export class AuthService {
     } catch (error: any) {
       console.error('[API] Upload selfie error:', error);
       
+      // Handle specific error cases
       if (error.response?.status === 401) {
         throw new Error('Authentication failed. Please login again.');
       } else if (error.response?.status === 413) {
         throw new Error('Image file too large. Please try with a smaller image.');
       } else if (error.response?.status === 400) {
         throw new Error(error.response?.data?.message || 'Invalid image format.');
+      } else if (error.response?.status === 404) {
+        throw new Error('Upload endpoint not found. Please check the API configuration.');
+      } else if (error.response?.status === 500) {
+        throw new Error('Server error. Please try again later.');
       } else if (error.code === 'ECONNABORTED') {
         throw new Error('Upload timeout. Please check your internet connection.');
       } else if (error.code === 'NETWORK_ERROR') {
         throw new Error('Network error. Please check your internet connection.');
+      } else if (error.message) {
+        throw new Error(error.message);
       } else {
-        throw new Error(error.response?.data?.message || 'Failed to upload selfie. Please try again.');
+        throw new Error('Failed to upload selfie. Please try again.');
       }
     }
   }

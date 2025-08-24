@@ -1,5 +1,4 @@
 import { Camera } from 'expo-camera';
-import * as FaceDetector from 'expo-face-detector';
 
 // Types for liveness detection
 export interface LivenessResult {
@@ -129,7 +128,7 @@ export class LivenessDetectionService {
    * Process face detection results for liveness
    * This would be called by the camera component
    */
-  processFaceDetection(faces: FaceDetector.FaceFeature[]): BlinkDetectionResult {
+  processFaceDetection(faces: any[]): BlinkDetectionResult {
     if (faces.length === 0) {
       return {
         isBlinking: false,

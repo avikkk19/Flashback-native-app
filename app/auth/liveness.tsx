@@ -1,3 +1,4 @@
+import { CameraView, useCameraPermissions } from 'expo-camera';
 import { router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import React, { useEffect, useRef, useState } from 'react';
@@ -16,44 +17,78 @@ import {
 import { Colors } from '@/constants/Colors';
 import { useAuth } from '@/contexts/AuthContext';
 import { useColorScheme } from '@/hooks/useColorScheme';
-import LivenessDetectionService, { LivenessResult } from '@/services/livenessDetection';
+import FaceDetectionService, { FaceDetectionResult, LivenessResult } from '@/services/faceDetectionService';
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
 export default function LivenessScreen() {
   const colorScheme = useColorScheme();
   const { completeLiveness } = useAuth();
-  const cameraRef = useRef<any>(null);
+  const cameraRef = useRef<CameraView>(null);
+  const [permission, requestPermission] = useCameraPermissions();
   
-  const [hasPermission, setHasPermission] = useState<boolean | null>(null);
   const [isChecking, setIsChecking] = useState(false);
   const [checkProgress, setCheckProgress] = useState(0);
   const [instructions, setInstructions] = useState<string[]>([]);
   const [tips, setTips] = useState<string[]>([]);
+  const [blinkCount, setBlinkCount] = useState(0);
+  const [faceDetected, setFaceDetected] = useState(false);
+  const [facePosition, setFacePosition] = useState<string>('unknown');
+  const [faceSize, setFaceSize] = useState<string>('unknown');
+  const [detectionConfidence, setDetectionConfidence] = useState<number>(0);
+  const [currentStatus, setCurrentStatus] = useState<string>('Position your face in the frame');
+  const [isInitializing, setIsInitializing] = useState(true);
+  const [initializationError, setInitializationError] = useState<string | null>(null);
 
   useEffect(() => {
     // Load instructions and tips
-    setInstructions(LivenessDetectionService.getInstructions());
-    setTips(LivenessDetectionService.getTips());
+    setInstructions(FaceDetectionService.getInstructions());
+    setTips(FaceDetectionService.getTips());
     
-    // Set permission as granted for now (using placeholder camera)
-    setHasPermission(true);
+    // Request camera permissions if not granted
+    if (!permission?.granted) {
+      requestPermission();
+    }
+
+    // Initialize face detection service
+    initializeService();
   }, []);
 
-
+  /**
+   * Initialize the face detection service
+   */
+  const initializeService = async () => {
+    try {
+      setIsInitializing(true);
+      setInitializationError(null);
+      
+      await FaceDetectionService.initialize();
+      console.log('Face detection service initialized successfully');
+    } catch (error: any) {
+      console.error('Failed to initialize face detection service:', error);
+      setInitializationError(error.message || 'Failed to initialize face detection');
+    } finally {
+      setIsInitializing(false);
+    }
+  };
 
   /**
-   * Start liveness check
+   * Start liveness check using the face detection service
    */
   const startLivenessCheck = async () => {
-    if (isChecking) return;
+    if (isChecking || isInitializing) return;
 
     setIsChecking(true);
     setCheckProgress(0);
-    LivenessDetectionService.reset();
+    setBlinkCount(0);
+    setFaceDetected(false);
+    setFacePosition('unknown');
+    setFaceSize('unknown');
+    setDetectionConfidence(0);
+    setCurrentStatus('Initializing face detection...');
 
     try {
-      // Simulate progress updates
+      // Start progress updates
       const progressInterval = setInterval(() => {
         setCheckProgress(prev => {
           if (prev >= 100) {
@@ -64,22 +99,43 @@ export default function LivenessScreen() {
         });
       }, 800); // 8 seconds total duration
 
-      // Perform liveness check
-      const result: LivenessResult = await LivenessDetectionService.performLivenessCheck(
-        cameraRef,
-        8000 // 8 seconds duration
-      );
+      // Update status messages during the check
+      const statusInterval = setInterval(() => {
+        const currentBlinkCount = FaceDetectionService.getBlinkCount();
+        const currentFaceStatus = FaceDetectionService.getFaceDetectionStatus();
+        
+        setBlinkCount(currentBlinkCount);
+        setFaceDetected(currentFaceStatus);
+        
+        if (currentBlinkCount === 0) {
+          setCurrentStatus('Please blink naturally...');
+        } else if (currentBlinkCount === 1) {
+          setCurrentStatus('Good! Please blink once more...');
+        } else if (currentBlinkCount >= 2) {
+          setCurrentStatus('Excellent! Keep your face visible...');
+        }
+      }, 500);
 
+      // Perform the actual liveness check
+      const result: LivenessResult = await FaceDetectionService.performLivenessCheck(cameraRef, 8000);
+      
       clearInterval(progressInterval);
+      clearInterval(statusInterval);
       setCheckProgress(100);
 
-      // Handle result
+      // Update final state
+      setBlinkCount(result.detectedBlinks);
+      setFaceDetected(result.faceDetected);
+      setFacePosition(result.facePosition);
+      setFaceSize(result.faceSize);
+      setDetectionConfidence(result.confidence);
+
       if (result.isLive) {
         // Mark liveness as completed
         await completeLiveness();
         
         Alert.alert(
-          'Liveness Check Passed!',
+          'Liveness Check Passed! 🎉',
           result.message,
           [
             {
@@ -96,8 +152,7 @@ export default function LivenessScreen() {
             {
               text: 'Try Again',
               onPress: () => {
-                setIsChecking(false);
-                LivenessDetectionService.reset();
+                resetLivenessCheck();
               },
             },
             {
@@ -109,14 +164,52 @@ export default function LivenessScreen() {
         );
       }
     } catch (error: any) {
-      Alert.alert('Error', error.message || 'Liveness check failed. Please try again.');
+      console.error('Liveness check error:', error);
+      Alert.alert(
+        'Error', 
+        error.message || 'Liveness check failed. Please try again.',
+        [
+          {
+            text: 'Try Again',
+            onPress: () => {
+              resetLivenessCheck();
+            },
+          },
+          {
+            text: 'Go Back',
+            onPress: () => router.back(),
+            style: 'cancel',
+          },
+        ]
+      );
     } finally {
       setIsChecking(false);
       setCheckProgress(0);
     }
   };
 
-  if (hasPermission === null) {
+  /**
+   * Reset liveness check state
+   */
+  const resetLivenessCheck = () => {
+    setIsChecking(false);
+    setBlinkCount(0);
+    setFaceDetected(false);
+    setFacePosition('unknown');
+    setFaceSize('unknown');
+    setDetectionConfidence(0);
+    setCurrentStatus('Position your face in the frame');
+    FaceDetectionService.reset();
+  };
+
+  /**
+   * Retry initialization
+   */
+  const retryInitialization = () => {
+    initializeService();
+  };
+
+  if (!permission) {
     return (
       <SafeAreaView style={[styles.container, { backgroundColor: Colors[colorScheme ?? 'light'].background }]}>
         <View style={styles.loadingContainer}>
@@ -129,7 +222,7 @@ export default function LivenessScreen() {
     );
   }
 
-  if (hasPermission === false) {
+  if (!permission?.granted) {
     return (
       <SafeAreaView style={[styles.container, { backgroundColor: Colors[colorScheme ?? 'light'].background }]}>
         <View style={styles.errorContainer}>
@@ -150,13 +243,61 @@ export default function LivenessScreen() {
     );
   }
 
+  if (isInitializing) {
+    return (
+      <SafeAreaView style={[styles.container, { backgroundColor: Colors[colorScheme ?? 'light'].background }]}>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={Colors[colorScheme ?? 'light'].tint} />
+          <Text style={[styles.loadingText, { color: Colors[colorScheme ?? 'light'].text }]}>
+            Initializing face detection...
+          </Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (initializationError) {
+    return (
+      <SafeAreaView style={[styles.container, { backgroundColor: Colors[colorScheme ?? 'light'].background }]}>
+        <View style={styles.errorContainer}>
+          <Text style={[styles.errorTitle, { color: Colors[colorScheme ?? 'light'].text }]}>
+            Initialization Failed
+          </Text>
+          <Text style={[styles.errorText, { color: Colors[colorScheme ?? 'light'].tabIconDefault }]}>
+            {initializationError}
+          </Text>
+          <TouchableOpacity
+            style={[styles.button, { backgroundColor: Colors[colorScheme ?? 'light'].tint }]}
+            onPress={retryInitialization}
+          >
+            <Text style={styles.buttonText}>Retry</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.button, { backgroundColor: Colors[colorScheme ?? 'light'].tabIconDefault, marginTop: 12 }]}
+            onPress={() => router.back()}
+          >
+            <Text style={styles.buttonText}>Go Back</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar style="light" />
       
-      {/* Camera Preview Placeholder */}
+      {/* Camera Preview */}
       <View style={styles.cameraContainer}>
-        <View style={[styles.camera, { backgroundColor: '#000' }]}>
+        <CameraView
+          ref={cameraRef}
+          style={styles.camera}
+          facing="front"
+          onCameraReady={() => console.log('[CAMERA] Camera ready')}
+          barcodeScannerSettings={{
+            barcodeTypes: [],
+          }}
+        >
           {/* Overlay */}
           <View style={styles.overlay}>
             {/* Progress Bar */}
@@ -173,8 +314,8 @@ export default function LivenessScreen() {
                 <Text style={styles.progressText}>
                   Analyzing liveness... {checkProgress}%
                 </Text>
-                <Text style={styles.blinkText}>
-                  Please blink naturally during the check
+                <Text style={styles.statusText}>
+                  Blinks: {blinkCount} | Face: {faceDetected ? '✓' : '✗'} | Confidence: {Math.round(detectionConfidence * 100)}%
                 </Text>
               </View>
             )}
@@ -190,14 +331,26 @@ export default function LivenessScreen() {
             {/* Instructions */}
             {!isChecking && (
               <View style={styles.instructionsContainer}>
-                <Text style={styles.instructionsTitle}>Blink Detection</Text>
+                <Text style={styles.instructionsTitle}>Liveness Check</Text>
                 <Text style={styles.instructionsSubtitle}>
                   Position your face in the frame and blink naturally
                 </Text>
               </View>
             )}
+            
+            {/* Real-time Status */}
+            {isChecking && (
+              <View style={styles.statusContainer}>
+                <Text style={styles.statusText}>
+                  {currentStatus}
+                </Text>
+                <Text style={styles.detailedStatus}>
+                  Position: {facePosition} | Size: {faceSize}
+                </Text>
+              </View>
+            )}
           </View>
-        </View>
+        </CameraView>
       </View>
 
       {/* Controls */}
@@ -230,8 +383,9 @@ export default function LivenessScreen() {
               <TouchableOpacity
                 style={[styles.button, { backgroundColor: Colors[colorScheme ?? 'light'].tint }]}
                 onPress={startLivenessCheck}
+                disabled={isInitializing}
               >
-                <Text style={styles.buttonText}>Start Blink Detection</Text>
+                <Text style={styles.buttonText}>Start Liveness Check</Text>
               </TouchableOpacity>
             </View>
           </>
@@ -239,7 +393,7 @@ export default function LivenessScreen() {
           <View style={styles.checkingContainer}>
             <ActivityIndicator size="large" color={Colors[colorScheme ?? 'light'].tint} />
             <Text style={[styles.checkingText, { color: Colors[colorScheme ?? 'light'].text }]}>
-              Performing blink detection...
+              Performing liveness detection...
             </Text>
             <Text style={[styles.checkingSubtext, { color: Colors[colorScheme ?? 'light'].tabIconDefault }]}>
               Please blink naturally 2-3 times
@@ -428,5 +582,42 @@ const styles = StyleSheet.create({
     fontSize: 14,
     marginTop: 8,
     textAlign: 'center',
+  },
+  promptContainer: {
+    position: 'absolute',
+    bottom: 50,
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 8,
+  },
+  promptText: {
+    color: 'white',
+    fontSize: 18,
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+  statusContainer: {
+    position: 'absolute',
+    bottom: 50,
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 8,
+  },
+  statusText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: '500',
+    textAlign: 'center',
+  },
+  detailedStatus: {
+    color: 'white',
+    fontSize: 12,
+    marginTop: 4,
+    textAlign: 'center',
+    opacity: 0.8,
   },
 });

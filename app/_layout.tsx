@@ -10,18 +10,19 @@ import { useColorScheme } from '@/hooks/useColorScheme';
 
 // Component to handle navigation based on auth state
 function RootLayoutNav() {
-  const { isAuthenticated, isLoading, livenessCompleted } = useAuth();
+  const { isAuthenticated, isLoading, livenessCompleted, user } = useAuth();
   const segments = useSegments();
   const router = useRouter();
 
   useEffect(() => {
-    console.log('[NAV] Layout effect triggered:', { isAuthenticated, livenessCompleted, segments, isLoading });
+    const selfieUploaded = user?.selfieUrl ? true : false;
+    console.log('[NAV] Layout effect triggered:', { isAuthenticated, livenessCompleted, selfieUploaded, segments, isLoading });
     if (isLoading) return;
 
     const inAuthGroup = segments[0] === 'auth';
     const currentScreen = segments[segments.length - 1];
 
-    console.log('[NAV] Auth state:', { isAuthenticated, livenessCompleted, inAuthGroup, currentScreen });
+    console.log('[NAV] Auth state:', { isAuthenticated, livenessCompleted, selfieUploaded, inAuthGroup, currentScreen });
 
     if (!isAuthenticated && !inAuthGroup) {
       // Not authenticated, go to phone screen
@@ -33,12 +34,18 @@ function RootLayoutNav() {
         console.log('[NAV] Redirecting to liveness screen');
         router.replace('/auth/liveness');
       }
-    } else if (isAuthenticated && livenessCompleted && inAuthGroup) {
-      // Authenticated and liveness completed, go to home
+    } else if (isAuthenticated && livenessCompleted && !selfieUploaded) {
+      // Liveness completed but selfie not uploaded, go to selfie
+      if (currentScreen !== 'selfie') {
+        console.log('[NAV] Redirecting to selfie screen');
+        router.replace('/auth/selfie');
+      }
+    } else if (isAuthenticated && livenessCompleted && selfieUploaded && inAuthGroup) {
+      // All steps completed, go to home
       console.log('[NAV] Redirecting to home screen');
       router.replace('/(tabs)');
     }
-  }, [isAuthenticated, livenessCompleted, segments, isLoading]);
+  }, [isAuthenticated, livenessCompleted, user?.selfieUrl, segments, isLoading]);
 
   return (
     <Stack>
