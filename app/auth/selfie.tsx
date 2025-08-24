@@ -25,7 +25,7 @@ const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
 export default function SelfieScreen() {
   const colorScheme = useColorScheme();
-  const { user, token, setSelfieUrl, completeSelfieUpload, logout, updateUser } = useAuth();
+  const { user, token, setSelfieUrl, saveLocalSelfiePath, completeSelfieUpload, logout, updateUser } = useAuth();
   const cameraRef = useRef<CameraView>(null);
   const [permission, requestPermission] = useCameraPermissions();
   
@@ -74,6 +74,20 @@ export default function SelfieScreen() {
       }
 
       setCapturedImage(photo.uri);
+      
+      // Save captured image to local storage immediately
+      try {
+        const localImagePath = await saveImageLocally(photo.uri, user?.username || 'selfie');
+        console.log('[SELFIE] Image saved locally:', localImagePath);
+        
+        // Update user context with local image path
+        await saveLocalSelfiePath(localImagePath);
+        console.log('[SELFIE] Local image path saved to context');
+      } catch (localError) {
+        console.error('[SELFIE] Failed to save image locally:', localError);
+        // Continue even if local save fails
+      }
+      
       console.log('[SELFIE] Selfie captured and stored');
       
     } catch (error: any) {
@@ -162,16 +176,27 @@ export default function SelfieScreen() {
       const localFileName = `${fileName}_${timestamp}.jpg`;
       const localPath = `${imagesDir}${localFileName}`;
 
-      // Download and save the image
-      console.log('[SELFIE] Saving image locally:', localPath);
-      const downloadResult = await FileSystem.downloadAsync(imageUri, localPath);
-      
-      if (downloadResult.status === 200) {
-        console.log('[SELFIE] Image saved locally successfully:', localPath);
-        return localPath;
+      // Check if the imageUri is a local file or remote URL
+      if (imageUri.startsWith('file://')) {
+        // Local file - copy it to our app directory
+        console.log('[SELFIE] Copying local image to app directory:', localPath);
+        await FileSystem.copyAsync({
+          from: imageUri,
+          to: localPath
+        });
+        console.log('[SELFIE] Local image copied successfully:', localPath);
       } else {
-        throw new Error('Failed to download image');
+        // Remote URL - download it
+        console.log('[SELFIE] Downloading remote image to:', localPath);
+        const downloadResult = await FileSystem.downloadAsync(imageUri, localPath);
+        
+        if (downloadResult.status !== 200) {
+          throw new Error('Failed to download image');
+        }
+        console.log('[SELFIE] Remote image downloaded successfully:', localPath);
       }
+      
+      return localPath;
     } catch (error) {
       console.error('[SELFIE] Error saving image locally:', error);
       throw error;
@@ -259,7 +284,7 @@ export default function SelfieScreen() {
               const localImagePath = await saveImageLocally(selfieUrl, user.username);
               
               // Update user context with local image path
-              await updateUser({ localSelfiePath: localImagePath });
+              await saveLocalSelfiePath(localImagePath);
             } catch (localError) {
               console.error('[SELFIE] Failed to save image locally:', localError);
               // Continue with upload success even if local save fails
@@ -555,62 +580,7 @@ export default function SelfieScreen() {
                 </Text>
               </TouchableOpacity>
 
-              {/* Temporary Mock Upload for Testing */}
-              {__DEV__ && (
-                <TouchableOpacity
-                  style={[
-                    styles.mockButton, 
-                    { 
-                      backgroundColor: '#FF9800',
-                      marginTop: 12
-                    }
-                  ]}
-                  onPress={async () => {
-                    console.log('[SELFIE] Using mock upload for testing');
-                    setIsUploading(true);
-                    setUploadProgress(0);
-                    
-                    // Simulate upload progress
-                    for (let i = 0; i <= 100; i += 10) {
-                      await new Promise(resolve => setTimeout(resolve, 200));
-                      setUploadProgress(i);
-                    }
-                    
-                    // Mock successful response
-                    const mockSelfieUrl = 'https://via.placeholder.com/400x400/4CAF50/FFFFFF?text=Mock+Selfie';
-                    await setSelfieUrl(mockSelfieUrl);
-                    
-                    // Save mock image locally
-                    try {
-                      if (user) {
-                        const localImagePath = await saveImageLocally(mockSelfieUrl, user.username);
-                        await updateUser({ localSelfiePath: localImagePath });
-                        console.log('[SELFIE] Mock image saved locally:', localImagePath);
-                      }
-                    } catch (localError) {
-                      console.error('[SELFIE] Failed to save mock image locally:', localError);
-                    }
-                    
-                    await completeSelfieUpload();
-                    
-                    setIsUploading(false);
-                    Alert.alert(
-                      'Mock Upload Complete',
-                      'This is a test upload. In production, this would be your actual selfie.',
-                      [
-                        {
-                          text: 'Continue to Home',
-                          onPress: () => router.replace('/(tabs)'),
-                        },
-                      ]
-                    );
-                  }}
-                >
-                  <Text style={styles.mockButtonText}>
-                    🧪 Mock Upload (Dev Only)
-                  </Text>
-                </TouchableOpacity>
-              )}
+
 
               {/* Test Connection Button */}
               <TouchableOpacity
@@ -1141,26 +1111,5 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: 4,
   },
-  mockButton: {
-    height: 48,
-    borderRadius: 16,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 2,
-    width: '100%',
-    marginTop: 12,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 1,
-    },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 2,
-  },
-  mockButtonText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: '500',
-  },
+
 });

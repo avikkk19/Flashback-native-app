@@ -23,6 +23,7 @@ interface AuthContextType extends AuthState {
   logout: () => Promise<void>;
   updateUser: (user: Partial<User>) => Promise<void>;
   setSelfieUrl: (url: string) => Promise<void>;
+  saveLocalSelfiePath: (path: string) => Promise<void>;
   completeLiveness: () => Promise<void>;
   completeSelfieUpload: () => Promise<void>;
 }
@@ -155,6 +156,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   /**
+   * Save local selfie path for the user
+   */
+  const saveLocalSelfiePath = async (path: string) => {
+    await updateUser({ localSelfiePath: path });
+  };
+
+  /**
    * Mark liveness check as completed
    */
   const completeLiveness = async () => {
@@ -190,6 +198,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     logout,
     updateUser,
     setSelfieUrl,
+    saveLocalSelfiePath,
     completeLiveness,
     completeSelfieUpload,
   };
