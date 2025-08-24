@@ -10,12 +10,11 @@ import { useColorScheme } from '@/hooks/useColorScheme';
 
 // Component to handle navigation based on auth state
 function RootLayoutNav() {
-  const { isAuthenticated, isLoading, livenessCompleted, user } = useAuth();
+  const { isAuthenticated, isLoading, livenessCompleted, selfieUploaded, user } = useAuth();
   const segments = useSegments();
   const router = useRouter();
 
   useEffect(() => {
-    const selfieUploaded = user?.selfieUrl ? true : false;
     console.log('[NAV] Layout effect triggered:', { isAuthenticated, livenessCompleted, selfieUploaded, segments, isLoading });
     if (isLoading) return;
 
@@ -45,7 +44,7 @@ function RootLayoutNav() {
       console.log('[NAV] Redirecting to home screen');
       router.replace('/(tabs)');
     }
-  }, [isAuthenticated, livenessCompleted, user?.selfieUrl, segments, isLoading]);
+  }, [isAuthenticated, livenessCompleted, selfieUploaded, segments, isLoading]);
 
   return (
     <Stack>

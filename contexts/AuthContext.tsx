@@ -6,6 +6,7 @@ export interface User {
   phoneNumber: string;
   username: string;
   selfieUrl?: string;
+  localSelfiePath?: string;
 }
 
 export interface AuthState {
@@ -14,6 +15,7 @@ export interface AuthState {
   token: string | null;
   isLoading: boolean;
   livenessCompleted: boolean;
+  selfieUploaded: boolean;
 }
 
 interface AuthContextType extends AuthState {
@@ -22,6 +24,7 @@ interface AuthContextType extends AuthState {
   updateUser: (user: Partial<User>) => Promise<void>;
   setSelfieUrl: (url: string) => Promise<void>;
   completeLiveness: () => Promise<void>;
+  completeSelfieUpload: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -39,6 +42,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     token: null,
     isLoading: true,
     livenessCompleted: false,
+    selfieUploaded: false,
   });
 
   // Load authentication state from storage on app start
@@ -64,6 +68,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           token,
           isLoading: false,
           livenessCompleted: false, // Reset liveness on app start
+          selfieUploaded: !!user.selfieUrl, // Set based on whether user has selfie URL
         });
       } else {
         setState(prev => ({ ...prev, isLoading: false }));
@@ -90,6 +95,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         token,
         isLoading: false,
         livenessCompleted: false, // New login requires liveness check
+        selfieUploaded: false, // New login requires selfie upload
       };
       console.log('[AUTH] Setting new state after login:', newState);
       setState(newState);
@@ -115,6 +121,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         token: null,
         isLoading: false,
         livenessCompleted: false,
+        selfieUploaded: false,
       });
     } catch (error) {
       console.error('Error clearing auth state:', error);
@@ -127,7 +134,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
    */
   const updateUser = async (userUpdate: Partial<User>) => {
     try {
-      const updatedUser = { ...state.user, ...userUpdate };
+      const updatedUser = state.user ? { ...state.user, ...userUpdate } : userUpdate as User;
       await AsyncStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(updatedUser));
       
       setState(prev => ({
@@ -162,6 +169,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  /**
+   * Mark selfie upload as completed
+   */
+  const completeSelfieUpload = async () => {
+    try {
+      setState(prev => ({
+        ...prev,
+        selfieUploaded: true,
+      }));
+    } catch (error) {
+      console.error('Error completing selfie upload:', error);
+      throw error;
+    }
+  };
+
   const value: AuthContextType = {
     ...state,
     login,
@@ -169,6 +191,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     updateUser,
     setSelfieUrl,
     completeLiveness,
+    completeSelfieUpload,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

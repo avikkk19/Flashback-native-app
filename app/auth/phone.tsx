@@ -2,236 +2,214 @@ import { router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import React, { useState } from 'react';
 import {
-  ActivityIndicator,
   Alert,
+  Dimensions,
   KeyboardAvoidingView,
   Platform,
-  SafeAreaView,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { ApiStatusIndicator } from '@/components/ApiStatusIndicator';
-import ENVIRONMENT from '@/config/environment';
 import { Colors } from '@/constants/Colors';
+import { useAuth } from '@/contexts/AuthContext';
 import { useColorScheme } from '@/hooks/useColorScheme';
-import { testApiConnection } from '@/services/api';
-import UnifiedAuthService from '@/services/unifiedApi';
+import AuthService, { testApiConnection } from '@/services/api';
+
+const { width: screenWidth } = Dimensions.get('window');
 
 export default function PhoneScreen() {
   const colorScheme = useColorScheme();
+  const { login } = useAuth();
   const [phoneNumber, setPhoneNumber] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [isTestingConnection, setIsTestingConnection] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   /**
-   * Test API connection before sending OTP
+   * Handle phone number submission
    */
-  const testConnection = async () => {
-    setIsTestingConnection(true);
-    try {
-      const isConnected = await testApiConnection();
-      if (isConnected) {
-        Alert.alert('Connection Test', '✅ API connection successful!');
+  const handleSubmit = async () => {
+    if (!phoneNumber.trim()) {
+      setError('Please enter your phone number');
+      return;
+    }
+
+    // Format phone number to E.164 format
+    let formattedNumber = phoneNumber.trim();
+    if (!formattedNumber.startsWith('+')) {
+      if (formattedNumber.startsWith('0')) {
+        formattedNumber = '+91' + formattedNumber.substring(1);
+      } else if (formattedNumber.length === 10) {
+        formattedNumber = '+91' + formattedNumber;
       } else {
-        Alert.alert('Connection Test', '❌ API connection failed. Please check your internet connection and try again.');
+        formattedNumber = '+' + formattedNumber;
       }
-    } catch (error: any) {
-      Alert.alert('Connection Test', `❌ Connection test failed: ${error.message}`);
-    } finally {
-      setIsTestingConnection(false);
     }
-  };
 
-  /**
-   * Validate phone number format (E.164)
-   */
-  const validatePhoneNumber = (phone: string): boolean => {
-    return ENVIRONMENT.PHONE_REGEX.test(phone);
-  };
-
-  /**
-   * Handle phone number input with formatting
-   */
-  const handlePhoneChange = (text: string) => {
-    // Remove all non-digit characters except +
-    const cleaned = text.replace(/[^\d+]/g, '');
-    
-    // Ensure it starts with +91
-    if (!cleaned.startsWith('+91')) {
-      setPhoneNumber('+91');
-    } else {
-      setPhoneNumber(cleaned);
-    }
-  };
-
-  /**
-   * Send OTP to the provided phone number
-   */
-  const handleSendOTP = async () => {
-    if (!validatePhoneNumber(phoneNumber)) {
-      Alert.alert(
-        'Invalid Phone Number',
-        'Please enter a valid Indian phone number in the format +91XXXXXXXXXX'
-      );
+    // Validate phone number format
+    const phoneRegex = /^\+[1-9]\d{1,14}$/;
+    if (!phoneRegex.test(formattedNumber)) {
+      setError('Please enter a valid phone number');
       return;
     }
 
     setIsLoading(true);
+    setError(null);
+
     try {
-      // Test connection first
+      // Test API connection first
       const isConnected = await testApiConnection();
       if (!isConnected) {
-        Alert.alert(
-          'Connection Error',
-          'Unable to connect to the server. Please check your internet connection and try again.',
-          [
-            { text: 'OK' },
-            { text: 'Test Connection', onPress: testConnection }
-          ]
-        );
-        return;
+        throw new Error('Unable to connect to server. Please check your internet connection.');
       }
 
-      const response = await UnifiedAuthService.sendOTP(phoneNumber);
+      console.log(`[API] Sending OTP to ${formattedNumber}`);
+      const response = await AuthService.sendOTP(formattedNumber);
       
-      // Show success message from API
-      const message = response.message || 'A verification code has been sent to your phone number.';
+      console.log('[API] OTP sent successfully:', response);
       
-      Alert.alert(
-        'OTP Sent',
-        message,
-        [
-          {
-            text: 'Continue',
-            onPress: () => router.push({
-              pathname: '/auth/otp',
-              params: { phoneNumber }
-            }),
-          },
-        ]
-      );
+      // Navigate to OTP screen
+      router.push('/auth/otp');
     } catch (error: any) {
-      console.error('Send OTP error:', error);
-      
-      if (error.message?.includes('Network Error')) {
-        Alert.alert(
-          'Network Error',
-          'Unable to connect to the server. Please check your internet connection and try again.',
-          [
-            { text: 'OK' },
-            { text: 'Test Connection', onPress: testConnection }
-          ]
-        );
-      } else {
-        Alert.alert('Error', error.message || 'Failed to send OTP. Please try again.');
-      }
+      console.error('[API] Send OTP error:', error);
+      setError(error.message || 'Failed to send OTP. Please try again.');
     } finally {
       setIsLoading(false);
     }
   };
 
-  const isPhoneValid = validatePhoneNumber(phoneNumber);
-  const isButtonDisabled = !isPhoneValid || isLoading;
+  /**
+   * Test API connection
+   */
+  const testConnection = async () => {
+    try {
+      const isConnected = await testApiConnection();
+      Alert.alert(
+        'Connection Test',
+        isConnected ? '✅ Server connection successful!' : '❌ Server connection failed',
+        [{ text: 'OK' }]
+      );
+    } catch (error) {
+      Alert.alert('Connection Test', '❌ Connection test failed', [{ text: 'OK' }]);
+    }
+  };
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: Colors[colorScheme ?? 'light'].background }]}>
       <StatusBar style={colorScheme === 'dark' ? 'light' : 'dark'} />
-      <ApiStatusIndicator />
       
       <KeyboardAvoidingView 
+        style={styles.keyboardAvoidingView}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        style={styles.keyboardView}
       >
-        <View style={styles.content}>
-          {/* Header */}
-          <View style={styles.header}>
-            <Text style={[styles.title, { color: Colors[colorScheme ?? 'light'].text }]}>
-              Welcome to Flashback
+        <ScrollView 
+          style={styles.scrollView}
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+        >
+          {/* Header Section */}
+          <View style={styles.headerSection}>
+            <Text style={styles.headerTitle}>
+              Go ahead and set up your account
             </Text>
-            <Text style={[styles.subtitle, { color: Colors[colorScheme ?? 'light'].tabIconDefault }]}>
-              Enter your phone number to get started
+            <Text style={styles.headerSubtitle}>
+              Sign in to enjoy the best authentication experience
             </Text>
           </View>
 
-          {/* Phone Input */}
-          <View style={styles.inputContainer}>
-            <Text style={[styles.label, { color: Colors[colorScheme ?? 'light'].text }]}>
-              Phone Number
-            </Text>
-            <TextInput
-              style={[
-                styles.input,
-                {
-                  backgroundColor: Colors[colorScheme ?? 'light'].background,
-                  borderColor: isPhoneValid ? Colors[colorScheme ?? 'light'].tint : Colors[colorScheme ?? 'light'].tabIconDefault,
-                  color: Colors[colorScheme ?? 'light'].text,
-                },
-              ]}
-              value={phoneNumber}
-              onChangeText={handlePhoneChange}
-              placeholder="+91XXXXXXXXXX"
-              placeholderTextColor={Colors[colorScheme ?? 'light'].tabIconDefault}
-              keyboardType="phone-pad"
-              autoFocus
-              maxLength={13}
-            />
-            {phoneNumber && !isPhoneValid && (
-              <Text style={styles.errorText}>
-                Please enter a valid Indian phone number
+          {/* Main Content Card */}
+          <View style={styles.contentCard}>
+            {/* App Logo */}
+            <View style={styles.logoContainer}>
+              <View style={styles.logoCircle}>
+                <Text style={styles.logoText}>📱</Text>
+              </View>
+              <Text style={styles.appName}>Flashback</Text>
+            </View>
+
+            {/* Phone Input Section */}
+            <View style={styles.inputSection}>
+              <Text style={styles.sectionTitle}>Enter your phone number</Text>
+              <Text style={styles.sectionSubtitle}>
+                We'll send you a verification code via WhatsApp
               </Text>
+
+              <View style={styles.inputContainer}>
+                <View style={styles.inputWrapper}>
+                  <Text style={styles.inputLabel}>Phone Number</Text>
+                  <View style={styles.phoneInputRow}>
+                    <View style={styles.countryCode}>
+                      <Text style={styles.countryCodeText}>+91</Text>
+                    </View>
+                    <TextInput
+                      style={styles.phoneInput}
+                      placeholder="Enter your phone number"
+                      placeholderTextColor="#999"
+                      value={phoneNumber}
+                      onChangeText={(text) => {
+                        setPhoneNumber(text);
+                        setError(null);
+                      }}
+                      keyboardType="phone-pad"
+                      maxLength={10}
+                      autoFocus
+                    />
+                  </View>
+                </View>
+
+                {/* Error Message */}
+                {error && (
+                  <View style={styles.errorContainer}>
+                    <Text style={styles.errorText}>{error}</Text>
+                  </View>
+                )}
+
+                {/* Submit Button */}
+                <TouchableOpacity
+                  style={[
+                    styles.submitButton,
+                    { 
+                      backgroundColor: isLoading 
+                        ? Colors[colorScheme ?? 'light'].tabIconDefault 
+                        : Colors[colorScheme ?? 'light'].tint 
+                    }
+                  ]}
+                  onPress={handleSubmit}
+                  disabled={isLoading}
+                >
+                  <Text style={styles.submitButtonText}>
+                    {isLoading ? 'Sending...' : 'Send Verification Code'}
+                  </Text>
+                </TouchableOpacity>
+
+                {/* Terms and Privacy */}
+                <View style={styles.termsContainer}>
+                  <Text style={styles.termsText}>
+                    By continuing, you agree to our{' '}
+                    <Text style={styles.termsLink}>Terms of Service</Text>
+                    {' '}and{' '}
+                    <Text style={styles.termsLink}>Privacy Policy</Text>
+                  </Text>
+                </View>
+              </View>
+            </View>
+
+            {/* Test Connection Button (Dev Only) */}
+            {__DEV__ && (
+              <TouchableOpacity
+                style={styles.testButton}
+                onPress={testConnection}
+              >
+                <Text style={styles.testButtonText}>🧪 Test Connection</Text>
+              </TouchableOpacity>
             )}
           </View>
-
-          {/* Send OTP Button */}
-          <TouchableOpacity
-            style={[
-              styles.button,
-              {
-                backgroundColor: isButtonDisabled 
-                  ? Colors[colorScheme ?? 'light'].tabIconDefault 
-                  : Colors[colorScheme ?? 'light'].tint,
-              },
-            ]}
-            onPress={handleSendOTP}
-            disabled={isButtonDisabled}
-          >
-            {isLoading ? (
-              <ActivityIndicator color="white" />
-            ) : (
-              <Text style={styles.buttonText}>Send OTP</Text>
-            )}
-          </TouchableOpacity>
-
-          {/* Test Connection Button */}
-          <TouchableOpacity
-            style={[
-              styles.secondaryButton,
-              {
-                borderColor: Colors[colorScheme ?? 'light'].tabIconDefault,
-                marginTop: 12,
-              },
-            ]}
-            onPress={testConnection}
-            disabled={isTestingConnection}
-          >
-            {isTestingConnection ? (
-              <ActivityIndicator color={Colors[colorScheme ?? 'light'].tabIconDefault} />
-            ) : (
-              <Text style={[styles.secondaryButtonText, { color: Colors[colorScheme ?? 'light'].tabIconDefault }]}>
-                Test Connection
-              </Text>
-            )}
-          </TouchableOpacity>
-
-          {/* Info Text */}
-          <Text style={[styles.infoText, { color: Colors[colorScheme ?? 'light'].tabIconDefault }]}>
-            We'll send a verification code to your phone number
-          </Text>
-        </View>
+        </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -241,78 +219,159 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  keyboardView: {
+  keyboardAvoidingView: {
     flex: 1,
   },
-  content: {
+  scrollView: {
     flex: 1,
+  },
+  scrollContent: {
+    flexGrow: 1,
+    justifyContent: 'center',
     paddingHorizontal: 24,
-    paddingTop: 60,
+    paddingTop: 20,
     paddingBottom: 40,
   },
-  header: {
+  headerSection: {
     alignItems: 'center',
-    marginBottom: 48,
+    marginBottom: 32,
   },
-  title: {
-    fontSize: 28,
+  headerTitle: {
+    fontSize: 24,
     fontWeight: 'bold',
     marginBottom: 8,
     textAlign: 'center',
   },
-  subtitle: {
-    fontSize: 16,
+  headerSubtitle: {
+    fontSize: 14,
     textAlign: 'center',
-    lineHeight: 24,
+    lineHeight: 20,
   },
-  inputContainer: {
-    marginBottom: 32,
+  contentCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
+    padding: 24,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 5,
   },
-  label: {
+  logoContainer: {
+    alignItems: 'center',
+    marginBottom: 24,
+  },
+  logoCircle: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: '#4CAF50',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  logoText: {
+    fontSize: 30,
+  },
+  appName: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    textAlign: 'center',
+    color: '#333',
+  },
+  inputSection: {
+    marginBottom: 24,
+  },
+  sectionTitle: {
     fontSize: 16,
     fontWeight: '600',
     marginBottom: 8,
   },
-  input: {
-    height: 56,
-    borderWidth: 2,
+  sectionSubtitle: {
+    fontSize: 12,
+    color: '#666',
+    marginBottom: 20,
+  },
+  inputContainer: {
+    marginBottom: 20,
+  },
+  inputWrapper: {
+    marginBottom: 12,
+  },
+  inputLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    marginBottom: 8,
+  },
+  phoneInputRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
     borderRadius: 12,
-    paddingHorizontal: 16,
+    borderColor: '#E0E0E0',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  countryCode: {
+    backgroundColor: '#F5F5F5',
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    marginRight: 8,
+  },
+  countryCodeText: {
     fontSize: 16,
     fontWeight: '500',
+  },
+  phoneInput: {
+    flex: 1,
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#333',
+  },
+  errorContainer: {
+    marginTop: 12,
+    marginBottom: 24,
   },
   errorText: {
     color: '#FF3B30',
     fontSize: 14,
-    marginTop: 8,
-    marginLeft: 4,
   },
-  button: {
+  submitButton: {
     height: 56,
     borderRadius: 12,
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 24,
   },
-  buttonText: {
+  submitButtonText: {
     color: 'white',
     fontSize: 16,
     fontWeight: '600',
   },
-  secondaryButton: {
+  termsContainer: {
+    alignItems: 'center',
+  },
+  termsText: {
+    fontSize: 14,
+    color: '#666',
+    textAlign: 'center',
+  },
+  termsLink: {
+    color: '#4CAF50',
+    textDecorationLine: 'underline',
+  },
+  testButton: {
     height: 56,
     borderRadius: 12,
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 1,
+    backgroundColor: '#E0E0E0',
+    marginTop: 12,
   },
-  secondaryButtonText: {
+  testButtonText: {
     fontSize: 16,
     fontWeight: '600',
-  },
-  infoText: {
-    fontSize: 14,
-    textAlign: 'center',
-    lineHeight: 20,
+    color: '#333',
   },
 });

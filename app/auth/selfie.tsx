@@ -7,24 +7,25 @@ import {
   Alert,
   Dimensions,
   Image,
-  SafeAreaView,
   StyleSheet,
   Text,
   TouchableOpacity,
-  View,
+  View
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Colors } from '@/constants/Colors';
 import { useAuth } from '@/contexts/AuthContext';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { testApiConnection, validateToken } from '@/services/api';
 import UnifiedAuthService from '@/services/unifiedApi';
+import * as FileSystem from 'expo-file-system';
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
 export default function SelfieScreen() {
   const colorScheme = useColorScheme();
-  const { user, token, setSelfieUrl, logout } = useAuth();
+  const { user, token, setSelfieUrl, completeSelfieUpload, logout, updateUser } = useAuth();
   const cameraRef = useRef<CameraView>(null);
   const [permission, requestPermission] = useCameraPermissions();
   
@@ -139,6 +140,45 @@ export default function SelfieScreen() {
   };
 
   /**
+   * Save image locally after successful upload
+   */
+  const saveImageLocally = async (imageUri: string, fileName: string): Promise<string> => {
+    try {
+      // Create app documents directory path
+      const documentsDir = FileSystem.documentDirectory;
+      if (!documentsDir) {
+        throw new Error('Documents directory not available');
+      }
+
+      // Create images directory if it doesn't exist
+      const imagesDir = `${documentsDir}images/`;
+      const dirInfo = await FileSystem.getInfoAsync(imagesDir);
+      if (!dirInfo.exists) {
+        await FileSystem.makeDirectoryAsync(imagesDir, { intermediates: true });
+      }
+
+      // Generate unique filename
+      const timestamp = Date.now();
+      const localFileName = `${fileName}_${timestamp}.jpg`;
+      const localPath = `${imagesDir}${localFileName}`;
+
+      // Download and save the image
+      console.log('[SELFIE] Saving image locally:', localPath);
+      const downloadResult = await FileSystem.downloadAsync(imageUri, localPath);
+      
+      if (downloadResult.status === 200) {
+        console.log('[SELFIE] Image saved locally successfully:', localPath);
+        return localPath;
+      } else {
+        throw new Error('Failed to download image');
+      }
+    } catch (error) {
+      console.error('[SELFIE] Error saving image locally:', error);
+      throw error;
+    }
+  };
+
+  /**
    * Upload selfie to backend with improved error handling
    */
   const uploadSelfie = async () => {
@@ -213,18 +253,40 @@ export default function SelfieScreen() {
           if (selfieUrl) {
             await setSelfieUrl(selfieUrl);
             console.log('[SELFIE] Selfie URL saved to context:', selfieUrl);
+            
+            // Save image locally
+            try {
+              const localImagePath = await saveImageLocally(selfieUrl, user.username);
+              
+              // Update user context with local image path
+              await updateUser({ localSelfiePath: localImagePath });
+            } catch (localError) {
+              console.error('[SELFIE] Failed to save image locally:', localError);
+              // Continue with upload success even if local save fails
+            }
           }
         }
 
+        // Mark selfie upload as completed
+        await completeSelfieUpload();
+        console.log('[SELFIE] Selfie upload marked as completed');
+
         setUploadProgress(100);
         
+        console.log('[SELFIE] Upload successful, navigating to home...');
+        
+        // Show success alert and navigate to home
         Alert.alert(
           'Success! 🎉',
           'Your selfie has been uploaded successfully. You can now proceed to the main app.',
           [
             {
-              text: 'Continue',
-              onPress: () => router.replace('/(tabs)'),
+              text: 'Continue to Home',
+              onPress: () => {
+                console.log('[SELFIE] User confirmed, navigating to home page');
+                // Navigate to home page
+                router.replace('/(tabs)');
+              },
             },
           ]
         );
@@ -237,7 +299,49 @@ export default function SelfieScreen() {
       console.error('[SELFIE] Upload error:', error);
       const errorMessage = error.message || 'Failed to upload selfie. Please try again.';
       setUploadError(errorMessage);
-      Alert.alert('Upload Error', errorMessage);
+      
+      // Handle specific error types with better user feedback
+      if (errorMessage.includes('Server error') || errorMessage.includes('500')) {
+        Alert.alert(
+          'Server Error',
+          'The server is experiencing issues. This might be a temporary problem. Would you like to try again?',
+          [
+            { text: 'Cancel', style: 'cancel' },
+            { 
+              text: 'Retry', 
+              onPress: () => {
+                console.log('[SELFIE] User chose to retry upload');
+                setTimeout(() => uploadSelfie(), 2000); // Retry after 2 seconds
+              }
+            },
+          ]
+        );
+      } else if (errorMessage.includes('Network error') || errorMessage.includes('timeout')) {
+        Alert.alert(
+          'Connection Error',
+          'Unable to connect to the server. Please check your internet connection and try again.',
+          [
+            { text: 'Cancel', style: 'cancel' },
+            { 
+              text: 'Retry', 
+              onPress: () => {
+                console.log('[SELFIE] User chose to retry upload');
+                setTimeout(() => uploadSelfie(), 1000);
+              }
+            },
+          ]
+        );
+      } else if (errorMessage.includes('Authentication')) {
+        Alert.alert(
+          'Authentication Error',
+          'Your session has expired. Please login again.',
+          [
+            { text: 'OK', onPress: () => handleLogout() }
+          ]
+        );
+      } else {
+        Alert.alert('Upload Error', errorMessage);
+      }
     } finally {
       setIsUploading(false);
     }
@@ -298,19 +402,20 @@ export default function SelfieScreen() {
         >
           <Text style={styles.backButtonText}>← Back</Text>
         </TouchableOpacity>
+        
         <View style={styles.headerCenter}>
-          <Text style={styles.headerTitle}>Selfie Capture</Text>
-          {token && (
-            <View style={[
-              styles.tokenStatus, 
-              { backgroundColor: validateToken(token) ? '#4CAF50' : '#f44336' }
-            ]}>
-              <Text style={styles.tokenStatusText}>
-                {validateToken(token) ? 'Token Valid' : 'Token Expired'}
-              </Text>
-            </View>
+          <Text style={styles.headerTitle}>Selfie Upload</Text>
+          {isUploading && (
+            <Text style={styles.headerStatus}>Uploading... {uploadProgress}%</Text>
+          )}
+          {uploadError && (
+            <Text style={styles.headerStatusError}>Upload Failed</Text>
+          )}
+          {!isUploading && uploadProgress === 100 && !uploadError && (
+            <Text style={styles.headerStatusSuccess}>✓ Uploaded</Text>
           )}
         </View>
+        
         <TouchableOpacity
           style={styles.logoutButton}
           onPress={handleLogout}
@@ -413,22 +518,22 @@ export default function SelfieScreen() {
               </View>
             )}
 
-            {/* Debug Info Panel */}
-            {__DEV__ && (
-              <View style={styles.debugPanel}>
-                <Text style={styles.debugTitle}>Debug Info:</Text>
-                <Text style={styles.debugText}>User: {user?.username || 'Unknown'}</Text>
-                <Text style={styles.debugText}>Token: {token ? `${token.substring(0, 20)}...` : 'Missing'}</Text>
-                <Text style={styles.debugText}>Image: {capturedImage ? 'Captured' : 'Not captured'}</Text>
-                <Text style={styles.debugText}>Upload Status: {isUploading ? 'In Progress' : 'Ready'}</Text>
-                <Text style={styles.debugText}>Progress: {uploadProgress}%</Text>
-              </View>
-            )}
-
             {/* Error Display */}
             {uploadError && (
               <View style={styles.errorMessage}>
                 <Text style={styles.errorMessageText}>{uploadError}</Text>
+                <TouchableOpacity
+                  style={[styles.retryButton, { borderColor: Colors[colorScheme ?? 'light'].tint }]}
+                  onPress={() => {
+                    console.log('[SELFIE] User clicked retry button');
+                    setUploadError(null);
+                    uploadSelfie();
+                  }}
+                >
+                  <Text style={[styles.retryButtonText, { color: Colors[colorScheme ?? 'light'].tint }]}>
+                    Retry Upload
+                  </Text>
+                </TouchableOpacity>
               </View>
             )}
 
@@ -445,12 +550,67 @@ export default function SelfieScreen() {
                 onPress={uploadSelfie}
                 disabled={isUploading}
               >
-                {isUploading ? (
-                  <ActivityIndicator color="white" />
-                ) : (
-                  <Text style={styles.buttonText}>Upload Selfie</Text>
-                )}
+                <Text style={styles.buttonText}>
+                  {isUploading ? 'Uploading...' : 'Upload Selfie'}
+                </Text>
               </TouchableOpacity>
+
+              {/* Temporary Mock Upload for Testing */}
+              {__DEV__ && (
+                <TouchableOpacity
+                  style={[
+                    styles.mockButton, 
+                    { 
+                      backgroundColor: '#FF9800',
+                      marginTop: 12
+                    }
+                  ]}
+                  onPress={async () => {
+                    console.log('[SELFIE] Using mock upload for testing');
+                    setIsUploading(true);
+                    setUploadProgress(0);
+                    
+                    // Simulate upload progress
+                    for (let i = 0; i <= 100; i += 10) {
+                      await new Promise(resolve => setTimeout(resolve, 200));
+                      setUploadProgress(i);
+                    }
+                    
+                    // Mock successful response
+                    const mockSelfieUrl = 'https://via.placeholder.com/400x400/4CAF50/FFFFFF?text=Mock+Selfie';
+                    await setSelfieUrl(mockSelfieUrl);
+                    
+                    // Save mock image locally
+                    try {
+                      if (user) {
+                        const localImagePath = await saveImageLocally(mockSelfieUrl, user.username);
+                        await updateUser({ localSelfiePath: localImagePath });
+                        console.log('[SELFIE] Mock image saved locally:', localImagePath);
+                      }
+                    } catch (localError) {
+                      console.error('[SELFIE] Failed to save mock image locally:', localError);
+                    }
+                    
+                    await completeSelfieUpload();
+                    
+                    setIsUploading(false);
+                    Alert.alert(
+                      'Mock Upload Complete',
+                      'This is a test upload. In production, this would be your actual selfie.',
+                      [
+                        {
+                          text: 'Continue to Home',
+                          onPress: () => router.replace('/(tabs)'),
+                        },
+                      ]
+                    );
+                  }}
+                >
+                  <Text style={styles.mockButtonText}>
+                    🧪 Mock Upload (Dev Only)
+                  </Text>
+                </TouchableOpacity>
+              )}
 
               {/* Test Connection Button */}
               <TouchableOpacity
@@ -606,6 +766,24 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: 'bold',
     textAlign: 'center',
+  },
+  headerStatus: {
+    color: '#4CAF50',
+    fontSize: 14,
+    fontWeight: '600',
+    marginTop: 5,
+  },
+  headerStatusError: {
+    color: '#f44336',
+    fontSize: 14,
+    fontWeight: '600',
+    marginTop: 5,
+  },
+  headerStatusSuccess: {
+    color: '#4CAF50',
+    fontSize: 14,
+    fontWeight: '600',
+    marginTop: 5,
   },
   backButton: {
     padding: 10,
@@ -912,28 +1090,26 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     fontWeight: '500',
   },
-  debugPanel: {
-    backgroundColor: '#f8f9fa',
-    padding: 20, // More padding for mobile
-    borderRadius: 12,
-    marginTop: 20,
-    alignSelf: 'stretch',
-    borderWidth: 1,
-    borderColor: '#dee2e6',
-    marginBottom: 20,
+  retryButton: {
+    height: 48,
+    borderRadius: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    width: '100%',
+    marginTop: 12,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 1,
+    },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 2,
   },
-  debugTitle: {
-    fontSize: 18, // Larger for mobile
-    fontWeight: 'bold',
-    marginBottom: 12,
-    textAlign: 'center',
-    color: '#495057',
-  },
-  debugText: {
-    fontSize: 16, // Larger for mobile
-    marginBottom: 6,
-    color: '#6c757d',
-    fontFamily: 'monospace',
+  retryButtonText: {
+    fontSize: 16,
+    fontWeight: '500',
   },
   logoutButton: {
     padding: 10,
@@ -964,5 +1140,27 @@ const styles = StyleSheet.create({
     fontSize: 14,
     textAlign: 'center',
     marginTop: 4,
+  },
+  mockButton: {
+    height: 48,
+    borderRadius: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    width: '100%',
+    marginTop: 12,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 1,
+    },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  mockButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: '500',
   },
 });
