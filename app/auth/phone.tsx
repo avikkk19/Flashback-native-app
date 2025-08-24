@@ -2,28 +2,49 @@ import { router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import React, { useState } from 'react';
 import {
-    ActivityIndicator,
-    Alert,
-    KeyboardAvoidingView,
-    Platform,
-    SafeAreaView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
+  SafeAreaView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 
 import { ApiStatusIndicator } from '@/components/ApiStatusIndicator';
 import ENVIRONMENT from '@/config/environment';
 import { Colors } from '@/constants/Colors';
 import { useColorScheme } from '@/hooks/useColorScheme';
+import { testApiConnection } from '@/services/api';
 import UnifiedAuthService from '@/services/unifiedApi';
 
 export default function PhoneScreen() {
   const colorScheme = useColorScheme();
   const [phoneNumber, setPhoneNumber] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [isTestingConnection, setIsTestingConnection] = useState(false);
+
+  /**
+   * Test API connection before sending OTP
+   */
+  const testConnection = async () => {
+    setIsTestingConnection(true);
+    try {
+      const isConnected = await testApiConnection();
+      if (isConnected) {
+        Alert.alert('Connection Test', '✅ API connection successful!');
+      } else {
+        Alert.alert('Connection Test', '❌ API connection failed. Please check your internet connection and try again.');
+      }
+    } catch (error: any) {
+      Alert.alert('Connection Test', `❌ Connection test failed: ${error.message}`);
+    } finally {
+      setIsTestingConnection(false);
+    }
+  };
 
   /**
    * Validate phone number format (E.164)
@@ -61,6 +82,20 @@ export default function PhoneScreen() {
 
     setIsLoading(true);
     try {
+      // Test connection first
+      const isConnected = await testApiConnection();
+      if (!isConnected) {
+        Alert.alert(
+          'Connection Error',
+          'Unable to connect to the server. Please check your internet connection and try again.',
+          [
+            { text: 'OK' },
+            { text: 'Test Connection', onPress: testConnection }
+          ]
+        );
+        return;
+      }
+
       const response = await UnifiedAuthService.sendOTP(phoneNumber);
       
       // Show success message from API
@@ -80,7 +115,20 @@ export default function PhoneScreen() {
         ]
       );
     } catch (error: any) {
-      Alert.alert('Error', error.message || 'Failed to send OTP. Please try again.');
+      console.error('Send OTP error:', error);
+      
+      if (error.message?.includes('Network Error')) {
+        Alert.alert(
+          'Network Error',
+          'Unable to connect to the server. Please check your internet connection and try again.',
+          [
+            { text: 'OK' },
+            { text: 'Test Connection', onPress: testConnection }
+          ]
+        );
+      } else {
+        Alert.alert('Error', error.message || 'Failed to send OTP. Please try again.');
+      }
     } finally {
       setIsLoading(false);
     }
@@ -158,6 +206,27 @@ export default function PhoneScreen() {
             )}
           </TouchableOpacity>
 
+          {/* Test Connection Button */}
+          <TouchableOpacity
+            style={[
+              styles.secondaryButton,
+              {
+                borderColor: Colors[colorScheme ?? 'light'].tabIconDefault,
+                marginTop: 12,
+              },
+            ]}
+            onPress={testConnection}
+            disabled={isTestingConnection}
+          >
+            {isTestingConnection ? (
+              <ActivityIndicator color={Colors[colorScheme ?? 'light'].tabIconDefault} />
+            ) : (
+              <Text style={[styles.secondaryButtonText, { color: Colors[colorScheme ?? 'light'].tabIconDefault }]}>
+                Test Connection
+              </Text>
+            )}
+          </TouchableOpacity>
+
           {/* Info Text */}
           <Text style={[styles.infoText, { color: Colors[colorScheme ?? 'light'].tabIconDefault }]}>
             We'll send a verification code to your phone number
@@ -227,6 +296,17 @@ const styles = StyleSheet.create({
   },
   buttonText: {
     color: 'white',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  secondaryButton: {
+    height: 56,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+  },
+  secondaryButtonText: {
     fontSize: 16,
     fontWeight: '600',
   },

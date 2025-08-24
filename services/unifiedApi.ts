@@ -20,8 +20,13 @@ export class UnifiedAuthService {
   /**
    * Upload selfie image to the backend
    */
-  static async uploadSelfie(imageUri: string, username: string, token: string) {
-    return AuthService.uploadSelfie(imageUri, username, token);
+  static async uploadSelfie(
+    imageUri: string, 
+    username: string, 
+    token: string,
+    onProgress?: (progress: number) => void
+  ) {
+    return AuthService.uploadSelfie(imageUri, username, token, onProgress);
   }
 }
 

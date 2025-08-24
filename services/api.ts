@@ -18,10 +18,10 @@ const apiClient = axios.create({
   timeout: 10000, // 10 second timeout
 });
 
-// Add cookie header only for mobile platforms
-if (Platform.OS !== 'web') {
-  apiClient.defaults.headers['Cookie'] = `refreshToken=${REFRESH_TOKEN}`;
-}
+// Remove the default cookie header - we'll handle it per request
+// if (Platform.OS !== 'web') {
+//   apiClient.defaults.headers['Cookie'] = `refreshToken=${REFRESH_TOKEN}`;
+// }
 
 // Add request interceptor for better error handling
 apiClient.interceptors.request.use(
@@ -43,9 +43,129 @@ apiClient.interceptors.response.use(
   },
   (error) => {
     console.error('[API] Response error:', error.response?.status, error.response?.data);
+    
+    // Log more details for network errors
+    if (error.code === 'NETWORK_ERROR') {
+      console.error('[API] Network error details:', {
+        message: error.message,
+        code: error.code,
+        config: error.config
+      });
+    }
+    
     return Promise.reject(error);
   }
 );
+
+// Test API connection
+export const testApiConnection = async (): Promise<boolean> => {
+  // Rate limiting - prevent multiple rapid connection tests
+  if (testApiConnection.lastTest && Date.now() - testApiConnection.lastTest < 5000) {
+    console.log('[API] Connection test rate limited - using cached result');
+    return testApiConnection.lastResult;
+  }
+  
+  try {
+    console.log('[API] Testing connection to:', API_BASE_URL);
+    
+    // Test with the working sendOTP endpoint (public, no auth required)
+    const response = await axios.get(`${API_BASE_URL}/sendOTP`, { 
+      timeout: 5000,
+      headers: {
+        'Content-Type': 'application/json',
+      }
+    });
+    
+    console.log('[API] Connection test successful:', response.status);
+    
+    // Cache the result
+    testApiConnection.lastTest = Date.now();
+    testApiConnection.lastResult = true;
+    
+    return true;
+  } catch (error: any) {
+    console.error('[API] Connection test failed:', error);
+    
+    // If sendOTP endpoint fails, try a different approach
+    if (error.response?.status === 401) {
+      // 401 means endpoint exists but requires auth - server is reachable
+      console.log('[API] Server is reachable but endpoint requires authentication');
+      
+      // Cache the result
+      testApiConnection.lastTest = Date.now();
+      testApiConnection.lastResult = true;
+      
+      return true; // Consider this a successful connection
+    } else if (error.response?.status === 404) {
+      try {
+        // Try to connect to the base URL
+        const baseResponse = await axios.get(API_BASE_URL, { timeout: 5000 });
+        console.log('[API] Base URL connection successful:', baseResponse.status);
+        
+        // Cache the result
+        testApiConnection.lastTest = Date.now();
+        testApiConnection.lastResult = true;
+        
+        return true;
+      } catch (baseError: any) {
+        console.error('[API] Base URL connection failed:', baseError);
+        
+        // Cache the result
+        testApiConnection.lastTest = Date.now();
+        testApiConnection.lastResult = false;
+        
+        return false;
+      }
+    }
+    
+    // Cache the result
+    testApiConnection.lastTest = Date.now();
+    testApiConnection.lastResult = false;
+    
+    return false;
+  }
+};
+
+// Add static properties for rate limiting
+testApiConnection.lastTest = 0;
+testApiConnection.lastResult = false;
+
+// Validate JWT token
+export const validateToken = (token: string): boolean => {
+  try {
+    if (!token || token.length < 50) {
+      console.log('[API] Token validation failed: Token too short');
+      return false;
+    }
+    
+    // Basic JWT structure validation
+    const parts = token.split('.');
+    if (parts.length !== 3) {
+      console.log('[API] Token validation failed: Invalid JWT structure');
+      return false;
+    }
+    
+    // Check if token might be expired (basic check)
+    try {
+      const payload = JSON.parse(atob(parts[1]));
+      const currentTime = Math.floor(Date.now() / 1000);
+      
+      if (payload.exp && payload.exp < currentTime) {
+        console.log('[API] Token validation failed: Token expired');
+        return false;
+      }
+      
+      console.log('[API] Token validation successful');
+      return true;
+    } catch (parseError) {
+      console.log('[API] Token validation failed: Cannot parse payload');
+      return false;
+    }
+  } catch (error) {
+    console.error('[API] Token validation error:', error);
+    return false;
+  }
+};
 
 // Types for API responses
 export interface SendOTPResponse {
@@ -150,11 +270,13 @@ export class AuthService {
    * @param imageUri - Local URI of the captured image
    * @param username - Username (E.164 phone number)
    * @param token - JWT token from OTP verification
+   * @param onProgress - Optional progress callback
    */
   static async uploadSelfie(
     imageUri: string,
     username: string,
-    token: string
+    token: string,
+    onProgress?: (progress: number) => void
   ): Promise<UploadSelfieResponse> {
     try {
       console.log(`[API] Uploading selfie for ${username}`);
@@ -199,13 +321,17 @@ export class AuthService {
         'Content-Type': 'multipart/form-data',
       };
 
-      // Add cookie header only for mobile platforms
+      // For mobile platforms, also include the refresh token in headers
       if (Platform.OS !== 'web') {
-        uploadHeaders['Cookie'] = `refreshToken=${REFRESH_TOKEN}`;
+        uploadHeaders['X-Refresh-Token'] = REFRESH_TOKEN;
+        // Remove cookie header as it's not needed for mobile
+        // uploadHeaders['Cookie'] = `refreshToken=${REFRESH_TOKEN}`;
       }
 
       console.log(`[API] Upload headers:`, uploadHeaders);
       console.log(`[API] Making request to: ${API_BASE_URL}/uploadUserPortrait`);
+      console.log(`[API] Token being used: ${token.substring(0, 20)}...`);
+      console.log(`[API] Refresh token: ${REFRESH_TOKEN.substring(0, 20)}...`);
 
       // Make request with authorization header
       const response = await axios.post(`${API_BASE_URL}/uploadUserPortrait`, formData, {
@@ -216,6 +342,11 @@ export class AuthService {
           if (progressEvent.total) {
             const progress = Math.round((progressEvent.loaded * 100) / progressEvent.total);
             console.log(`[API] Upload progress: ${progress}%`);
+            
+            // Call progress callback if provided
+            if (onProgress) {
+              onProgress(progress);
+            }
           }
         },
       });
@@ -227,7 +358,23 @@ export class AuthService {
       
       // Handle specific error cases
       if (error.response?.status === 401) {
-        throw new Error('Authentication failed. Please login again.');
+        console.error('[API] 401 Error Details:', {
+          status: error.response.status,
+          data: error.response.data,
+          headers: error.response.headers,
+          tokenLength: token?.length,
+          tokenStart: token?.substring(0, 20),
+          refreshTokenLength: REFRESH_TOKEN?.length,
+          refreshTokenStart: REFRESH_TOKEN?.substring(0, 20)
+        });
+        
+        if (error.response.data?.error?.includes('expired')) {
+          throw new Error('Authentication token has expired. Please login again.');
+        } else if (error.response.data?.error?.includes('invalid')) {
+          throw new Error('Invalid authentication token. Please login again.');
+        } else {
+          throw new Error('Authentication failed. Please check your login and try again.');
+        }
       } else if (error.response?.status === 413) {
         throw new Error('Image file too large. Please try with a smaller image.');
       } else if (error.response?.status === 400) {

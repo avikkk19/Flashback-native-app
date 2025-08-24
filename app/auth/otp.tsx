@@ -109,17 +109,11 @@ export default function OTPScreen() {
         // Login user with access token
         await login(user, response.accessToken);
         
-        console.log('User logged in successfully, navigating to liveness...');
-        
-        // Liveness check will be handled by the layout navigation
         console.log('User logged in successfully, layout will handle navigation to liveness...');
         console.log('Current auth state after login:', { isAuthenticated: true, livenessCompleted: false });
         
-        // Force navigation to liveness after a short delay to ensure state is updated
-        setTimeout(() => {
-          console.log('Forcing navigation to liveness...');
-          router.replace('/auth/liveness');
-        }, 100);
+        // Let the layout navigation handle the flow
+        // The layout will automatically redirect to liveness since livenessCompleted is false
       } else {
         const errorMessage = response.error || response.message || 'Invalid OTP. Please try again.';
         Alert.alert('Verification Failed', errorMessage);
