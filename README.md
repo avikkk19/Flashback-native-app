@@ -71,21 +71,18 @@ A production-ready React Native application with advanced liveness detection usi
 
 1. **Create environment file**
    ```bash
-   cp .env.example .env
+   cp config/environment.example.ts config/environment.ts
    ```
 
-2. **Configure environment variables**
-   ```bash
-   # .env
-   API_BASE_URL=https://your-api-domain.com/api/mobile
-   REFRESH_TOKEN=your-refresh-token
-   USE_MOCK_API=false
-   ENABLE_LIVENESS_CHECK=true
-   ENABLE_SELFIE_UPLOAD=true
-   # ... other config
+2. **Configure API endpoints**
+   ```typescript
+   // config/environment.ts
+   export default {
+     API_BASE_URL: 'https://your-api-domain.com/api/mobile',
+     REFRESH_TOKEN: 'your-refresh-token',
+     // ... other config
+   };
    ```
-
-3. **Environment variables are automatically loaded** from the `.env` file and can be imported using `@env` in your code.
 
 ### Running the App
 
@@ -101,25 +98,6 @@ A production-ready React Native application with advanced liveness detection usi
    
    # iOS
    npm run ios
-
-### Building APK
-
-1. **Build preview APK (for testing)**
-   ```bash
-   npm run build:android:preview
-   ```
-
-2. **Build production APK**
-   ```bash
-   npm run build:android:production
-   ```
-
-3. **Build locally (requires Android Studio)**
-   ```bash
-   npm run build:android:local
-   ```
-
-**Note**: The first build may take 10-15 minutes as it builds in the cloud. Subsequent builds are faster due to caching.
    
    # Web
    npm run web

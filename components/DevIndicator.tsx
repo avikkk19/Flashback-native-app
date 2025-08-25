@@ -1,6 +1,6 @@
-import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
 import ENVIRONMENT from '@/config/environment';
+import React from 'react';
+import { StyleSheet, Text, View } from 'react-native';
 
 export const DevIndicator: React.FC = () => {
   if (!__DEV__ || !ENVIRONMENT.USE_MOCK_API) {
