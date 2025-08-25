@@ -1,13 +1,19 @@
 # Learn more https://docs.github.com/en/get-started/getting-started-with-git/ignoring-files
 
-# dependencies
+# Dependencies
 node_modules/
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+package-lock.json
+yarn.lock
 
 # Expo
 .expo/
 dist/
 web-build/
 expo-env.d.ts
+.expo-shared/
 
 # Native
 .kotlin/
@@ -20,8 +26,9 @@ expo-env.d.ts
 
 # Metro
 .metro-health-check*
+.metro/
 
-# debug
+# Debug
 npm-debug.*
 yarn-debug.*
 yarn-error.*
@@ -30,11 +37,150 @@ yarn-error.*
 .DS_Store
 *.pem
 
-# local env files
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Linux
+*~
+
+# Local env files
+.env
 .env*.local
+.env.development
+.env.test
+.env.production
 
-
-# typescript
+# TypeScript
 *.tsbuildinfo
 
-app-example
+# Build outputs
+android/app/build/
+android/build/
+android/.gradle/
+android/gradle/
+android/local.properties
+android/captures/
+android/gradlew
+android/gradlew.bat
+android/settings.gradle
+android/gradle.properties
+
+# iOS
+ios/build/
+ios/Pods/
+ios/*.xcworkspace
+ios/*.xcodeproj
+ios/DerivedData/
+ios/Flashback.xcworkspace/
+ios/Flashback.xcodeproj/
+
+# APK/IPA files
+*.apk
+*.aab
+*.ipa
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+
+# Runtime data
+pids/
+*.pid
+*.seed
+*.pid.lock
+
+# Coverage directory used by tools like istanbul
+coverage/
+*.lcov
+
+# nyc test coverage
+.nyc_output
+
+# Dependency directories
+jspm_packages/
+
+# Optional npm cache directory
+.npm
+
+# Optional eslint cache
+.eslintcache
+
+# Microbundle cache
+.rpt2_cache/
+.rts2_cache_cjs/
+.rts2_cache_es/
+.rts2_cache_umd/
+
+# Optional REPL history
+.node_repl_history
+
+# Output of 'npm pack'
+*.tgz
+
+# Yarn Integrity file
+.yarn-integrity
+
+# dotenv environment variables file
+.env
+.env.test
+.env.production
+
+# parcel-bundler cache (https://parceljs.org/)
+.cache
+.parcel-cache
+
+# Next.js build output
+.next
+
+# Nuxt.js build / generate output
+.nuxt
+dist
+
+# Gatsby files
+.cache/
+public
+
+# Storybook build outputs
+.out
+.storybook-out
+
+# Temporary folders
+tmp/
+temp/
+
+# Editor directories and files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# App specific
+app-example/
+config/environment.ts
+config/environment.production.ts
+config/environment.staging.ts
+
+# Testing
+coverage/
+.nyc_output/
+.jest/
+
+# Misc
+*.tgz
+*.tar.gz

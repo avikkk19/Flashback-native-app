@@ -18,7 +18,7 @@
 ### Unused Scripts
 - `scripts/reset-project.js`
 - `scripts/` directory (removed when empty)
-
+p
 ## Dependencies Removed
 
 ### Unused Expo Packages
