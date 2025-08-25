@@ -1,37 +1,62 @@
+import {
+  ANIMATION_DURATION,
+  API_BASE_URL,
+  APP_NAME,
+  APP_VERSION,
+  CHECK_DURATION,
+  COMPRESSION_QUALITY,
+  DEBOUNCE_DELAY,
+  ENABLE_DEV_SKIP_OPTIONS,
+  ENABLE_LIVENESS_CHECK,
+  ENABLE_SELFIE_UPLOAD,
+  FRAME_PROCESSING_INTERVAL,
+  LIVENESS_CHECK_DURATION,
+  MAX_CONSECUTIVE_NO_FACE_FRAMES,
+  MAX_FILE_SIZE,
+  MIN_BLINK_COUNT,
+  MIN_FACE_DETECTION_RATE,
+  OTP_LENGTH,
+  OTP_TIMEOUT,
+  PHONE_REGEX,
+  REFRESH_TOKEN,
+  UPLOAD_TIMEOUT,
+  USE_MOCK_API,
+} from '@env';
+
 // Environment configuration for the Flashback app
-// Update these values according to your backend setup
+// Values are now loaded from .env file
 
 export const ENVIRONMENT = {
   // API Configuration
-  API_BASE_URL: 'https://flashback.inc:9000/api/mobile',
+  API_BASE_URL: API_BASE_URL || 'https://flashback.inc:9000/api/mobile',
   
   // Authentication
-  REFRESH_TOKEN: 'my-token-example', // Replace with actual token provided by hackathon organizers
+  REFRESH_TOKEN: REFRESH_TOKEN || 'my-token-example',
   
   // Development Settings
-  USE_MOCK_API: false, // Always false for production
+  USE_MOCK_API: USE_MOCK_API === 'true',
   
   // App Configuration
-  APP_NAME: 'Flashback',
-  APP_VERSION: '1.0.0',
+  APP_NAME: APP_NAME || 'Flashback',
+  APP_VERSION: APP_VERSION || '1.0.0',
   
   // Feature Flags
-  ENABLE_LIVENESS_CHECK: true,
-  ENABLE_SELFIE_UPLOAD: true,
-  ENABLE_DEV_SKIP_OPTIONS: false, // Always false for production
+  ENABLE_LIVENESS_CHECK: ENABLE_LIVENESS_CHECK === 'true',
+  ENABLE_SELFIE_UPLOAD: ENABLE_SELFIE_UPLOAD === 'true',
+  ENABLE_DEV_SKIP_OPTIONS: ENABLE_DEV_SKIP_OPTIONS === 'true',
   
   // Timeouts
-  OTP_TIMEOUT: 30000, // 30 seconds
-  LIVENESS_CHECK_DURATION: 8000, // 8 seconds
-  UPLOAD_TIMEOUT: 60000, // 60 seconds
+  OTP_TIMEOUT: parseInt(OTP_TIMEOUT) || 30000,
+  LIVENESS_CHECK_DURATION: parseInt(LIVENESS_CHECK_DURATION) || 8000,
+  UPLOAD_TIMEOUT: parseInt(UPLOAD_TIMEOUT) || 60000,
   
   // Validation
-  PHONE_REGEX: /^\+91[6-9]\d{9}$/, // Indian phone numbers
-  OTP_LENGTH: 6,
+  PHONE_REGEX: new RegExp(PHONE_REGEX || '^\\+91[6-9]\\d{9}$'),
+  OTP_LENGTH: parseInt(OTP_LENGTH) || 6,
   
   // UI Configuration
-  ANIMATION_DURATION: 300,
-  DEBOUNCE_DELAY: 500,
+  ANIMATION_DURATION: parseInt(ANIMATION_DURATION) || 300,
+  DEBOUNCE_DELAY: parseInt(DEBOUNCE_DELAY) || 500,
   
   // API Endpoints
   ENDPOINTS: {
@@ -42,27 +67,27 @@ export const ENVIRONMENT = {
   
   // File Upload Configuration
   UPLOAD: {
-    MAX_FILE_SIZE: 10 * 1024 * 1024, // 10MB
+    MAX_FILE_SIZE: parseInt(MAX_FILE_SIZE) || 10 * 1024 * 1024,
     ALLOWED_TYPES: ['image/jpeg', 'image/png', 'image/jpg'],
-    COMPRESSION_QUALITY: 0.8,
+    COMPRESSION_QUALITY: parseFloat(COMPRESSION_QUALITY) || 0.8,
   },
   
   // Liveness Detection Configuration
   LIVENESS: {
-    MIN_BLINK_COUNT: 3,
-    MIN_FACE_DETECTION_RATE: 0.8, // 80%
-    MAX_CONSECUTIVE_NO_FACE_FRAMES: 3,
-    FRAME_PROCESSING_INTERVAL: 200, // ms - optimized for React Native camera analysis
-    CHECK_DURATION: 8000, // ms
+    MIN_BLINK_COUNT: parseInt(MIN_BLINK_COUNT) || 3,
+    MIN_FACE_DETECTION_RATE: parseFloat(MIN_FACE_DETECTION_RATE) || 0.8,
+    MAX_CONSECUTIVE_NO_FACE_FRAMES: parseInt(MAX_CONSECUTIVE_NO_FACE_FRAMES) || 3,
+    FRAME_PROCESSING_INTERVAL: parseInt(FRAME_PROCESSING_INTERVAL) || 200,
+    CHECK_DURATION: parseInt(CHECK_DURATION) || 8000,
   },
 };
 
 // Production overrides - no development options
-console.log('[ENV] Production mode enabled');
+console.log('[ENV] Environment loaded from .env file');
 console.log('[ENV] API Base URL:', ENVIRONMENT.API_BASE_URL);
 console.log('[ENV] Refresh Token:', ENVIRONMENT.REFRESH_TOKEN ? 'Present' : 'Missing');
-console.log('[ENV] Mock API: Disabled');
-console.log('[ENV] Dev Skip Options: Disabled');
+console.log('[ENV] Mock API:', ENVIRONMENT.USE_MOCK_API ? 'Enabled' : 'Disabled');
+console.log('[ENV] Dev Skip Options:', ENVIRONMENT.ENABLE_DEV_SKIP_OPTIONS ? 'Enabled' : 'Disabled');
 
 // Check if we can reach the API
 import('@/services/api').then(({ testApiConnection }) => {

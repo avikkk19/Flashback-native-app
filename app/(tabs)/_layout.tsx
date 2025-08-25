@@ -1,13 +1,13 @@
 import { Tabs } from 'expo-router';
 import React from 'react';
-import { Platform, TouchableOpacity, Text, View, Image } from 'react-native';
+import { Image, Platform, Text, TouchableOpacity, View } from 'react-native';
 
 import { HapticTab } from '@/components/HapticTab';
 import { IconSymbol } from '@/components/ui/IconSymbol';
 import TabBarBackground from '@/components/ui/TabBarBackground';
 import { Colors } from '@/constants/Colors';
-import { useColorScheme } from '@/hooks/useColorScheme';
 import { useAuth } from '@/contexts/AuthContext';
+import { useColorScheme } from '@/hooks/useColorScheme';
 
 export default function TabLayout() {
   const colorScheme = useColorScheme();
@@ -72,15 +72,7 @@ export default function TabLayout() {
                 </Text>
               </View>
             )}
-            <Text style={{ 
-              color: Colors[colorScheme ?? 'light'].text, 
-              fontSize: 14, 
-              fontWeight: '500',
-              marginLeft: 8,
-              maxWidth: 100,
-            }}>
-              {user?.phoneNumber || 'User'}
-            </Text>
+
           </View>
         ),
       }}>
